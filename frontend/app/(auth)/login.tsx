@@ -15,17 +15,13 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
-    console.log('[DEBUG] submit: start');
     setError(null);
     setLoading(true);
     try {
       await login(email.trim(), password);
-      console.log('[DEBUG] submit: login resolved');
     } catch (e: any) {
-      console.log('[DEBUG] submit: login threw', e && e.message, e);
       setError(e.message);
     } finally {
-      console.log('[DEBUG] submit: finally, setLoading(false)');
       setLoading(false);
     }
   };

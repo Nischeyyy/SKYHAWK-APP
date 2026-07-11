@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
+const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 const TOKEN_KEY = 'skyhawk_auth_token';
 
 async function getStoredToken(): Promise<string | null> {
@@ -39,22 +39,18 @@ export async function api<T = any>(
     const token = await getStoredToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
-  console.log('[DEBUG] api: fetching', `${BASE}/api${path}`);
   const res = await fetch(`${BASE}/api${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
-  console.log('[DEBUG] api: fetch resolved, status', res.status);
   const text = await res.text();
-  console.log('[DEBUG] api: text read, len', text.length);
   let data: any = null;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
     data = text;
   }
-  console.log('[DEBUG] api: parsed, returning');
   if (!res.ok) {
     const msg = (data && (data.detail || data.message)) || `Request failed (${res.status})`;
     throw new Error(msg);
