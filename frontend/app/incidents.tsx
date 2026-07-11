@@ -8,6 +8,7 @@ import { theme } from "@/src/theme";
 import { Button } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { relativeTime } from "@/src/utils/format";
+import { tap as hapticTap, success as hapticSuccess } from "@/src/utils/haptics";
 
 const TYPES = [
   { id: "incident", label: "Incident" },
@@ -58,6 +59,7 @@ export default function Incidents() {
         witness_name: witnessName || undefined, witness_contact: witnessPhone || undefined,
         photos, signature_base64: "signed",
       } });
+      hapticSuccess();
       setToast("Report submitted");
       setTimeout(() => setToast(null), 2500);
       setDescription(""); setWitnessName(""); setWitnessPhone(""); setPhotos([]); setSigned(false);

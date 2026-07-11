@@ -9,6 +9,7 @@ import { theme } from "@/src/theme";
 import { Button } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { formatShiftTime } from "@/src/utils/format";
+import { success as hapticSuccess, impact as hapticImpact } from "@/src/utils/haptics";
 
 type Step = "idle" | "locating" | "camera" | "confirming";
 
@@ -64,6 +65,7 @@ export default function TimeClock() {
         },
       });
       setActive(r.entry);
+      hapticSuccess();
       setStep("idle");
       setSelfie(null);
     } catch (e: any) { setError(e.message); }
@@ -79,11 +81,13 @@ export default function TimeClock() {
         latitude = l.coords.latitude; longitude = l.coords.longitude;
       }
       await api("/timeclock/clock-out", { method: "POST", body: { latitude, longitude } });
+      hapticSuccess();
       setActive(null);
     } catch (e: any) { setError(e.message); }
   };
 
   const toggleBreak = async () => {
+    hapticImpact();
     const onBreak = active?.breaks?.length && !active.breaks[active.breaks.length - 1].end;
     try {
       const r: any = await api("/timeclock/break", { method: "POST", body: { action: onBreak ? "end" : "start" } });

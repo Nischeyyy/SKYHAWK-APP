@@ -1,6 +1,12 @@
 import React, { useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Animated, Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { theme } from '../theme';
+
+function tap() {
+  if (Platform.OS === 'web') return;
+  try { Haptics.selectionAsync(); } catch {}
+}
 
 export function Button({ label, onPress, variant = 'primary', disabled, style, testID }: any) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -8,11 +14,15 @@ export function Button({ label, onPress, variant = 'primary', disabled, style, t
   const bg = isPrimary ? theme.colors.accent : 'transparent';
   const color = isPrimary ? theme.colors.onAccent : theme.colors.text;
   const border = variant === 'secondary' ? theme.colors.border : 'transparent';
+  const handlePress = () => {
+    tap();
+    onPress?.();
+  };
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
       <Pressable
         testID={testID}
-        onPress={onPress}
+        onPress={handlePress}
         disabled={disabled}
         onPressIn={() => Animated.spring(scale, { toValue: 0.98, useNativeDriver: true, speed: 40 }).start()}
         onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start()}

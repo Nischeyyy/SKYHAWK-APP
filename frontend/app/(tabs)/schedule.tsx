@@ -56,7 +56,7 @@ export default function Schedule() {
         <ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={theme.colors.textSecondary} />}
           showsVerticalScrollIndicator={false}
         >

@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/src/theme";
 import { api } from "@/src/api/client";
 import { relativeTime } from "@/src/utils/format";
+import { success as hapticSuccess } from "@/src/utils/haptics";
 
 export default function Announcements() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function Announcements() {
   const ack = async (id: string) => {
     try {
       await api(`/announcements/${id}/acknowledge`, { method: "POST" });
+      hapticSuccess();
       setItems((prev) => prev.map((a) => a.id === id ? { ...a, read: true, read_count: (a.read_count || 0) + 1 } : a));
     } catch {}
   };

@@ -5,6 +5,7 @@ import { useFocusEffect } from "expo-router";
 import { theme } from "@/src/theme";
 import { api } from "@/src/api/client";
 import { formatShiftTime, formatDate, formatCurrency, hoursBetween } from "@/src/utils/format";
+import { success as hapticSuccess, impact as hapticImpact } from "@/src/utils/haptics";
 
 export default function OpenShifts() {
   const [data, setData] = useState<any>(null);
@@ -28,9 +29,11 @@ export default function OpenShifts() {
   };
 
   const claim = async (id: string) => {
+    hapticImpact();
     setClaiming(id);
     try {
       const r: any = await api(`/open-shifts/${id}/claim`, { method: "POST" });
+      hapticSuccess();
       showToast(r.status === "waitlisted" ? "Added to waitlist" : "Shift claimed");
       await load();
     } catch (e: any) {
@@ -41,9 +44,11 @@ export default function OpenShifts() {
   };
 
   const cancel = async (id: string) => {
+    hapticImpact();
     setClaiming(id);
     try {
       await api(`/open-shifts/${id}/cancel-claim`, { method: "POST" });
+      hapticSuccess();
       showToast("Claim cancelled");
       await load();
     } catch (e: any) {
@@ -65,7 +70,7 @@ export default function OpenShifts() {
         <ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={theme.colors.textSecondary} />}
           showsVerticalScrollIndicator={false}
         >

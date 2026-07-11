@@ -31,7 +31,7 @@ export default function Wallet() {
       <View style={styles.header}>
         <Text style={styles.title}>Wallet</Text>
       </View>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         {/* Wallet-style ID card — minimal, like Apple Wallet */}
         <View style={styles.idCard} testID="id-card">
           <View style={styles.idHeader}>

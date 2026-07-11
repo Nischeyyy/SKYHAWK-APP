@@ -261,7 +261,7 @@ function ActionButton({ icon, label, onPress, danger, testID }: any) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
-  container: { paddingHorizontal: 24, paddingBottom: 60 },
+  container: { paddingHorizontal: 24, paddingBottom: 120 },
   greetHeader: {
     flexDirection: "row",
     alignItems: "flex-start",

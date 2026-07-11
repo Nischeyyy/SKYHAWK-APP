@@ -31,7 +31,7 @@ export default function Profile() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.name}>{u?.full_name}</Text>
           <Text style={styles.subtitle}>{u?.employment_status} · {u?.employee_number}</Text>
