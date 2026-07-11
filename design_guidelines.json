@@ -1,0 +1,171 @@
+{
+  "app_name": "Skyhawk Security Operations",
+  "personality": "7 Dark-First Utility",
+  "personality_one_liner": "A sharp, high-contrast, tactical command center designed for night patrols, rapid reporting, and high-visibility operations.",
+  "color": {
+    "surface": "#0F172A",
+    "onSurface": "#F8FAFC",
+    "surfaceSecondary": "#1E293B",
+    "onSurfaceSecondary": "#CBD5E1",
+    "surfaceTertiary": "#334155",
+    "onSurfaceTertiary": "#94A3B8",
+    "surfaceInverse": "#F8FAFC",
+    "onSurfaceInverse": "#0F172A",
+    "brand": "#F59E0B",
+    "brandPrimary": "#F59E0B",
+    "onBrandPrimary": "#0F172A",
+    "brandSecondary": "#D97706",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#451A03",
+    "onBrandTertiary": "#FDE68A",
+    "success": "#10B981",
+    "onSuccess": "#022C22",
+    "warning": "#F59E0B",
+    "onWarning": "#451A03",
+    "error": "#EF4444",
+    "onError": "#450A0A",
+    "info": "#3B82F6",
+    "onInfo": "#EFF6FF",
+    "border": "#334155",
+    "borderStrong": "#475569",
+    "divider": "#1E293B"
+  },
+  "typography": {
+    "displayFontFamily": "Barlow Condensed",
+    "textFontFamily": "DM Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Dense but scannable. Use smaller gaps inside metric cards and strict md padding on edges. No wasted space, prioritize glanceability over generous white space.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": 0,
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": false,
+    "do's": [
+      "Avoid blur/glass on dark-first utility interfaces to prioritize clarity and performance, especially for dense data screens."
+    ],
+    "dont's": [
+      "No frosted glass overlays; rely on solid surfaceSecondary and surfaceTertiary for elevation."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Dashboard",
+      "purpose": "Command center for the current shift with high-level stats, clock-in CTA, and emergency access.",
+      "states": {
+        "loading": "Centered brand-colored spinner with 'Syncing Operations...' text.",
+        "empty": "No active shift today. Display secondary illustration and a link to Open Shifts.",
+        "error": "Failed to load dashboard. Retry button."
+      },
+      "layout": "Sticky primary clock-in CTA at the bottom. Top section features a large active shift card with Barlow Condensed metrics (Time, Site, Guard Count). Below it, priority announcements with red/amber badges. Use horizontal scrolling cards for quick actions."
+    },
+    {
+      "name": "Open Shifts",
+      "purpose": "A marketplace to claim available shifts, filtered by date and site.",
+      "states": {
+        "loading": "Skeleton loaders for shift cards.",
+        "empty": "Phosphor CalendarBlank icon + 'No open shifts matching your criteria'.",
+        "error": "Unable to fetch shifts. Retry button."
+      },
+      "layout": "Sticky pinned filter row (Date, Site, Distance). Shift cards fill 100% width with sharp edges, displaying pay rate, time, and distance. Contextual 'Claim Shift' button aligned right inside the card. Uncomplicated layout."
+    },
+    {
+      "name": "Time Clock",
+      "purpose": "GPS and selfie verification flow for clocking in/out with precise timestamps.",
+      "states": {
+        "loading": "Spinner over map: 'Verifying Location...'",
+        "empty": "N/A - Flow-based screen.",
+        "error": "Location mismatch error or Camera permission denied with clear resolution steps."
+      },
+      "layout": "Large Barlow Condensed timestamp taking up the top third. Live map view (dark mode) confirming geofence. A prominent, full-width selfie capture area with overlay grid, followed by an oversized 'Confirm Clock-In' button at the bottom."
+    },
+    {
+      "name": "Digital Wallet",
+      "purpose": "Digital presentation of employee ID and security licences for quick scanning.",
+      "states": {
+        "loading": "Skeleton of the ID card.",
+        "empty": "No digital licences found.",
+        "error": "Failed to load wallet. Tap to refresh."
+      },
+      "layout": "Mimics physical cards. A high-contrast Employee ID card with the user's photo and a large, scannable QR code centered. Horizontal swipe/pager to view secondary licences (First Aid, WHMIS) with scannable barcodes if applicable."
+    },
+    {
+      "name": "Payroll",
+      "purpose": "Pipeline tracker showing hours worked and progression from Submitted to Paid.",
+      "states": {
+        "loading": "Skeleton loaders for payroll periods.",
+        "empty": "No payroll history available yet.",
+        "error": "Error fetching payroll. Retry button."
+      },
+      "layout": "Header shows 'Next Payday' in large display font. Below it, a vertical timeline/pipeline component showing the status (Submitted -> Under Review -> Released -> Paid) with active states highlighted in green/success tokens."
+    },
+    {
+      "name": "Incident Reporting",
+      "purpose": "Structured form to log incidents, injuries, or property damage with photo evidence.",
+      "states": {
+        "loading": "Submitting incident...",
+        "empty": "N/A - Form entry.",
+        "error": "Failed to submit report. Draft saved locally."
+      },
+      "layout": "Single-column form. Labels above inputs. Dark input backgrounds (surfaceTertiary). A clear area for photo attachments using grid layout, and a digital signature pad at the bottom above a sticky Submit CTA."
+    }
+  ],
+  "images": {
+    "dashboard_hero_bg": {
+      "url": "https://images.unsplash.com/photo-1515093619859-d98321073408",
+      "alt": "Dark city skyline at night to give a tactical night-shift vibe behind the main dashboard header."
+    },
+    "guard_profile_avatar": {
+      "url": "https://images.unsplash.com/photo-1547882230-87a3d4390e8d",
+      "alt": "Professional security guard wearing a cap in black and white."
+    },
+    "incident_report_abstract": {
+      "url": "https://images.pexels.com/photos/10061609/pexels-photo-10061609.jpeg",
+      "alt": "Abstract dark camera lens, used as a header graphic for the incident reporting or monitoring screens."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the Dark-First Utility guidelines. No blur or glassmorphism effects unless absolutely required; rely on solid background layers (surfaceSecondary, surfaceTertiary) to create elevation.",
+    "Use 'Barlow Condensed' for all metrics, timers, pay rates, and live indicators. Use 'DM Sans' for body text and labels.",
+    "Ensure touch targets are robust (minimum 44x44pt).",
+    "For the open shift marketplace, use a sticky filter row and ensure shift cards have clear hierarchy (Time -> Location -> Pay -> Action).",
+    "For the digital wallet, design the ID card to be high-contrast and easily scannable in dark environments. Ensure the QR code sits on a light background box if necessary for scanning compatibility.",
+    "The primary accent is Amber/High-Vis Orange (#F59E0B). Use it for primary actions, active shift indicators, and important alerts. Use 'error' red ONLY for genuine errors or critical security alarms.",
+    "Always apply a vertical gradient scrim (transparent to 70%+ surfaceInverse) when placing text over any background image (like the dashboard hero image) to ensure WCAG readability.",
+    "Since the `image_selector_tool` did not find a real Skyhawk Security logo, implement the approved fallback: create a circular container using 'brandTertiary' background with the initials 'SH' in 'onBrandTertiary' text at weight 500.",
+    "Integrate haptic feedback on all primary interactions: clock-ins, shift claims, and tab switching."
+  ]
+}
