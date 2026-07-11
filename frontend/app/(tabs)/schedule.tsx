@@ -2,7 +2,9 @@ import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/src/theme";
+import { StatusPill } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { formatShiftTime, formatDate } from "@/src/utils/format";
 
@@ -79,8 +81,12 @@ export default function Schedule() {
                     <Text style={styles.shiftRole}>{s.role}</Text>
                   </View>
                   {s.status === "completed" ? (
-                    <Text style={styles.completedText}>Completed</Text>
-                  ) : null}
+                    <Ionicons name="checkmark-circle" size={20} color={theme.colors.verified} testID={`completed-${s.id}`} />
+                  ) : s.instructions_acknowledged ? (
+                    <StatusPill label="Ready" tone="accent" />
+                  ) : (
+                    <StatusPill label="Pending Ack" tone="warning" />
+                  )}
                 </Pressable>
               ))}
             </View>

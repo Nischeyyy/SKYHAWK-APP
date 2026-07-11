@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/src/theme";
+import { Avatar, StatusPill } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
 
@@ -33,8 +34,12 @@ export default function Profile() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
+          <Avatar name={u?.full_name} size={72} testID="profile-avatar" />
           <Text style={styles.name}>{u?.full_name}</Text>
-          <Text style={styles.subtitle}>{u?.employment_status} · {u?.employee_number}</Text>
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+            <StatusPill label={u?.employment_status || "Active"} tone="verified" />
+            <StatusPill label={u?.employee_number || ""} tone="neutral" />
+          </View>
         </View>
 
         <Group>
@@ -111,8 +116,8 @@ function NavRow({ icon, label, onPress, last, testID }: any) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
-  header: { paddingTop: 20, paddingBottom: 20 },
-  name: { color: theme.colors.text, fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
+  header: { paddingTop: 20, paddingBottom: 24, alignItems: "center" },
+  name: { color: theme.colors.text, fontSize: 24, fontWeight: "700", letterSpacing: -0.4, marginTop: 14 },
   subtitle: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 4 },
   groupLabel: { color: theme.colors.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6, marginTop: 24, marginBottom: 6, paddingHorizontal: 4 },
   group: { backgroundColor: theme.colors.card, borderRadius: theme.radius.md, paddingHorizontal: 16 },

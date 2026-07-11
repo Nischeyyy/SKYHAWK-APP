@@ -2,7 +2,9 @@ import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/src/theme";
+import { StatusPill } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { formatShiftTime, formatDate, formatCurrency, hoursBetween } from "@/src/utils/format";
 import { success as hapticSuccess, impact as hapticImpact } from "@/src/utils/haptics";
@@ -80,6 +82,7 @@ export default function OpenShifts() {
             const spotsLeft = s.spots_available - (s.claimed_by?.length || 0);
             const claimed = s.already_claimed;
             const waitlisted = s.on_waitlist;
+            const isTopPick = idx === 0 && !claimed && !waitlisted; // Filled button only for #1
             return (
               <View
                 key={s.id}
@@ -87,29 +90,44 @@ export default function OpenShifts() {
                 style={[styles.item, idx < shifts.length - 1 && styles.itemBorder]}
               >
                 <View style={styles.itemHeader}>
-                  <Text style={styles.itemDate}>{formatDate(s.start)}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Text style={styles.itemDate}>{formatDate(s.start)}</Text>
+                    {isTopPick && <StatusPill label="Top Pick" tone="accent" />}
+                    {s.urgent && <StatusPill label="Urgent" tone="warning" />}
+                  </View>
                   <Text style={styles.itemPay}>{formatCurrency(s.pay_rate)}<Text style={styles.perHr}>/hr</Text></Text>
                 </View>
                 <Text style={styles.itemTime}>{formatShiftTime(s.start)} – {formatShiftTime(s.end)}</Text>
-                <Text style={styles.itemSite}>{s.site?.name}</Text>
-                <Text style={styles.itemMeta}>
-                  {s.role} · {hrs}h · {spotsLeft} spot{spotsLeft !== 1 ? "s" : ""}
-                </Text>
+                <View style={styles.metaRow}>
+                  <Ionicons name="business-outline" size={13} color={theme.colors.textSecondary} />
+                  <Text style={styles.itemSite}>{s.site?.name}</Text>
+                </View>
+                <View style={styles.metaRow}>
+                  <Ionicons name="shield-outline" size={13} color={theme.colors.textSecondary} />
+                  <Text style={styles.itemMeta}>{s.role} · {hrs}h · {spotsLeft} spot{spotsLeft !== 1 ? "s" : ""}</Text>
+                </View>
 
                 <View style={{ marginTop: 14 }}>
                   {claiming === s.id ? (
-                    <ActivityIndicator color={theme.colors.text} size="small" />
+                    <ActivityIndicator color={theme.colors.accent} size="small" />
                   ) : claimed ? (
-                    <Pressable testID={`cancel-claim-${s.id}`} onPress={() => cancel(s.id)} style={styles.actionBtn}>
-                      <Text style={styles.actionText}>Claimed · Tap to Cancel</Text>
+                    <Pressable testID={`cancel-claim-${s.id}`} onPress={() => cancel(s.id)} style={styles.claimedBtn}>
+                      <Ionicons name="checkmark-circle" size={16} color={theme.colors.verified} />
+                      <Text style={styles.claimedText}>Claimed · Tap to Cancel</Text>
                     </Pressable>
                   ) : waitlisted ? (
-                    <Pressable testID={`leave-waitlist-${s.id}`} onPress={() => cancel(s.id)} style={styles.actionBtn}>
-                      <Text style={styles.actionText}>On Waitlist · Tap to Leave</Text>
+                    <Pressable testID={`leave-waitlist-${s.id}`} onPress={() => cancel(s.id)} style={styles.outlineBtn}>
+                      <Text style={styles.outlineText}>On Waitlist · Leave</Text>
+                    </Pressable>
+                  ) : isTopPick ? (
+                    <Pressable testID={`claim-${s.id}`} onPress={() => claim(s.id)} style={styles.primaryBtn}>
+                      <Text style={styles.primaryText}>{spotsLeft > 0 ? "Claim Shift" : "Join Waitlist"}</Text>
+                      <Ionicons name="arrow-forward" size={16} color="#fff" />
                     </Pressable>
                   ) : (
-                    <Pressable testID={`claim-${s.id}`} onPress={() => claim(s.id)} style={styles.claimBtn}>
-                      <Text style={styles.claimText}>{spotsLeft > 0 ? "Claim Shift" : "Join Waitlist"}</Text>
+                    <Pressable testID={`claim-${s.id}`} onPress={() => claim(s.id)} style={styles.linkBtn}>
+                      <Text style={styles.linkText}>{spotsLeft > 0 ? "Claim" : "Join Waitlist"}</Text>
+                      <Ionicons name="arrow-forward" size={14} color={theme.colors.accent} />
                     </Pressable>
                   )}
                 </View>
@@ -139,8 +157,31 @@ const styles = StyleSheet.create({
   itemPay: { color: theme.colors.text, fontSize: 20, fontWeight: "600" },
   perHr: { fontSize: 12, color: theme.colors.textSecondary, fontWeight: "400" },
   itemTime: { color: theme.colors.text, fontSize: 18, fontWeight: "500", marginTop: 6 },
-  itemSite: { color: theme.colors.text, fontSize: 15, marginTop: 4 },
-  itemMeta: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 2 },
+  itemSite: { color: theme.colors.text, fontSize: 15, marginLeft: 4 },
+  itemMeta: { color: theme.colors.textSecondary, fontSize: 13, marginLeft: 4 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
+  primaryBtn: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: theme.radius.md,
+    paddingVertical: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  primaryText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  outlineBtn: {
+    borderColor: theme.colors.border,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: theme.radius.md,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  outlineText: { color: theme.colors.text, fontSize: 14 },
+  linkBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
+  linkText: { color: theme.colors.accent, fontSize: 14, fontWeight: "500" },
+  claimedBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8 },
+  claimedText: { color: theme.colors.textSecondary, fontSize: 13 },
   claimBtn: { backgroundColor: theme.colors.text, borderRadius: theme.radius.md, paddingVertical: 12, alignItems: "center" },
   claimText: { color: theme.colors.bg, fontSize: 15, fontWeight: "600" },
   actionBtn: { borderColor: theme.colors.border, borderWidth: 1, borderRadius: theme.radius.md, paddingVertical: 12, alignItems: "center" },

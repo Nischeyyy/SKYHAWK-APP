@@ -45,7 +45,7 @@ export default function TabsLayout() {
       screenListeners={{ tabPress: tapHaptic }}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.text,
+        tabBarActiveTintColor: theme.colors.accent,
         tabBarInactiveTintColor: theme.colors.textTertiary,
         tabBarBackground: () => <TabBg />,
         tabBarStyle: {
