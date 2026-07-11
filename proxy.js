@@ -11,12 +11,17 @@ const FRONTEND_PORT = 8080;
 const PROXY_PORT = 5000;
 
 function forward(req, res, targetPort) {
+  // Preserve the original Host header (the public Replit domain) instead of
+  // rewriting it to localhost:<port>. Expo's dev server CORS middleware
+  // compares the browser's Origin host against the request's Host header
+  // and rejects the request if they don't match, which happens whenever
+  // this app is viewed through the Replit proxy/iframe.
   const options = {
     hostname: 'localhost',
     port: targetPort,
     path: req.url,
     method: req.method,
-    headers: { ...req.headers, host: `localhost:${targetPort}` },
+    headers: { ...req.headers },
   };
 
   const proxyReq = http.request(options, (proxyRes) => {
