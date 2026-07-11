@@ -1,4 +1,5 @@
 #!/bin/bash
-# Write the backend URL at startup so Expo can find the API
-echo "EXPO_PUBLIC_BACKEND_URL=https://8000-${REPLIT_DEV_DOMAIN}" > .env
-npx expo start --web --port 5000 --non-interactive
+# Use relative URLs so API calls go through the port-5000 proxy
+echo "EXPO_PUBLIC_BACKEND_URL=" > .env
+# Start expo web on port 8080 (proxied from 5000 via proxy.js)
+CI=1 npx expo start --web --port 8080
