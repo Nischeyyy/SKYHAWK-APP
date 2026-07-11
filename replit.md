@@ -28,6 +28,12 @@ The webview shows the Expo web app at port 5000.
 | `DB_NAME` | Env var | MongoDB database name (set to `skyhawk_ops`) |
 | `EMERGENT_PUSH_KEY` | Optional secret | Push notification key (falls back gracefully if missing) |
 
+See `backend/.env.example` for the full list with placeholders. On Replit, set `MONGO_URL`/`JWT_SECRET` as Secrets (never commit real values); `DB_NAME` is a shared env var already set in `.replit`. There is no Replit-managed MongoDB integration — `MONGO_URL` must point at your own MongoDB Atlas (or other) cluster.
+
+## Python dependency management
+
+`backend/requirements.txt` is the original dependency manifest from the imported repo and is kept for reference/non-Replit use. On Replit, packages are actually installed via the root `pyproject.toml`/`uv.lock` (created by Replit's package manager) into `.pythonlibs`, which is what `uvicorn` resolves against. When adding a Python dependency, add it to both files to keep them in sync.
+
 ## Demo credentials
 
 The backend seeds demo data on first start:
