@@ -1,7 +1,10 @@
 import React, { useCallback, useState, useRef, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator, Animated } from "react-native";
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator, Animated, Linking, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import * as Location from "expo-location";
 import { theme } from "@/src/theme";
 import { Button } from "@/src/ui";
 import { api } from "@/src/api/client";
@@ -21,6 +24,8 @@ export default function Dashboard() {
   const [data, setData] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sosOpen, setSosOpen] = useState(false);
+  const [sosSubmitting, setSosSubmitting] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
 
   const load = useCallback(async () => {
@@ -55,6 +60,41 @@ export default function Dashboard() {
   const next = data?.next_shift;
   const activeClock = data?.active_clock;
   const firstName = user?.full_name.split(" ")[0];
+  const dispatchNumber = "+14165550000";
+
+  const triggerSos = async () => {
+    setSosSubmitting(true);
+    try {
+      if (typeof Haptics.notificationAsync === "function") {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
+      let lat: number | undefined;
+      let lng: number | undefined;
+      try {
+        const p = await Location.requestForegroundPermissionsAsync();
+        if (p.status === "granted") {
+          const l = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          lat = l.coords.latitude;
+          lng = l.coords.longitude;
+        }
+      } catch {}
+      try {
+        await api("/incidents", {
+          method: "POST",
+          body: {
+            type: "sos",
+            severity: "critical",
+            description: `Emergency SOS triggered by guard${lat && lng ? ` at ${lat.toFixed(4)}, ${lng.toFixed(4)}` : ""}.`,
+            site_id: today?.site_id,
+          },
+        });
+      } catch {}
+      Linking.openURL(`tel:${dispatchNumber}`);
+    } finally {
+      setSosSubmitting(false);
+      setSosOpen(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -111,6 +151,40 @@ export default function Dashboard() {
             </View>
           )}
 
+          {/* Quick actions — SOS is red (the sole exception) */}
+          <View style={styles.actionsRow}>
+            <ActionButton
+              testID="sos-btn"
+              label="SOS"
+              danger
+              onPress={() => {
+                if (typeof Haptics.selectionAsync === "function") Haptics.selectionAsync();
+                setSosOpen(true);
+              }}
+              icon={
+                <Text style={styles.sosText}>SOS</Text>
+              }
+            />
+            <ActionButton
+              testID="call-dispatch-btn"
+              label="Dispatch"
+              onPress={() => {
+                if (typeof Haptics.selectionAsync === "function") Haptics.selectionAsync();
+                Linking.openURL(`tel:${dispatchNumber}`);
+              }}
+              icon={<Ionicons name="call-outline" size={22} color={theme.colors.text} />}
+            />
+            <ActionButton
+              testID="create-report-btn"
+              label="Report"
+              onPress={() => {
+                if (typeof Haptics.selectionAsync === "function") Haptics.selectionAsync();
+                router.push("/incidents");
+              }}
+              icon={<Ionicons name="document-text-outline" size={22} color={theme.colors.text} />}
+            />
+          </View>
+
           {next && (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Upcoming</Text>
@@ -125,7 +199,63 @@ export default function Dashboard() {
           )}
         </Animated.View>
       </ScrollView>
+
+      <Modal
+        visible={sosOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSosOpen(false)}
+      >
+        <View style={styles.modalScrim}>
+          <View style={styles.modalCard} testID="sos-modal">
+            <Text style={styles.sosModalTitle}>Emergency SOS</Text>
+            <Text style={styles.sosModalBody}>
+              This will alert dispatch, share your location, and place a call to the emergency line.
+            </Text>
+            <View style={{ height: 22 }} />
+            <Pressable
+              testID="sos-confirm-btn"
+              onPress={triggerSos}
+              disabled={sosSubmitting}
+              style={styles.sosConfirm}
+            >
+              {sosSubmitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.sosConfirmText}>Send Emergency Alert</Text>
+              )}
+            </Pressable>
+            <Pressable
+              testID="sos-cancel-btn"
+              onPress={() => setSosOpen(false)}
+              style={styles.sosCancel}
+            >
+              <Text style={styles.sosCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+function ActionButton({ icon, label, onPress, danger, testID }: any) {
+  const scale = useRef(new Animated.Value(1)).current;
+  return (
+    <View style={styles.actionItem}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable
+          testID={testID}
+          onPress={onPress}
+          onPressIn={() => Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, speed: 40 }).start()}
+          onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start()}
+          style={[styles.actionCircle, danger && styles.actionCircleDanger]}
+        >
+          {icon}
+        </Pressable>
+      </Animated.View>
+      <Text style={[styles.actionLabel, danger && styles.actionLabelDanger]}>{label}</Text>
+    </View>
   );
 }
 
@@ -158,4 +288,86 @@ const styles = StyleSheet.create({
   emptyText: { color: theme.colors.textSecondary, fontSize: 16 },
   upcomingSite: { color: theme.colors.text, fontSize: 16 },
   upcomingMeta: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 4 },
+
+  // Quick actions
+  actionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingBottom: 44,
+    paddingHorizontal: 8,
+  },
+  actionItem: { alignItems: "center", flex: 1 },
+  actionCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: theme.colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionCircleDanger: {
+    backgroundColor: "#1F0A0A",
+    borderWidth: 1,
+    borderColor: "#FF453A",
+  },
+  actionLabel: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginTop: 8,
+    fontWeight: "500",
+  },
+  actionLabelDanger: { color: "#FF453A" },
+  sosText: {
+    color: "#FF453A",
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+
+  // SOS Modal
+  modalScrim: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
+  modalCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 16,
+    padding: 22,
+  },
+  sosModalTitle: {
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  sosModalBody: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    marginTop: 10,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  sosConfirm: {
+    backgroundColor: "#FF453A",
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  sosConfirmText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  sosCancel: {
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 6,
+  },
+  sosCancelText: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: "500",
+  },
 });
