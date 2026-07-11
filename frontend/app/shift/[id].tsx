@@ -16,10 +16,7 @@ export default function ShiftDetail() {
   const [acking, setAcking] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      const d: any = await api(`/shifts/${id}`);
-      setS(d);
-    } catch {}
+    try { const d: any = await api(`/shifts/${id}`); setS(d); } catch {}
     setLoading(false);
   }, [id]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -33,113 +30,94 @@ export default function ShiftDetail() {
     setAcking(false);
   };
 
-  if (loading || !s) {
-    return <SafeAreaView style={styles.safe}><ActivityIndicator color={theme.colors.brandPrimary} style={{ marginTop: 40 }} /></SafeAreaView>;
-  }
+  if (loading || !s) return <SafeAreaView style={styles.safe}><ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} /></SafeAreaView>;
   const hrs = hoursBetween(s.start, s.end);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="arrow-back" size={22} color={theme.colors.onSurface} />
+        <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }}>
+          <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
         </Pressable>
-        <Text style={styles.title}>SHIFT DETAILS</Text>
-        <View style={{ width: 22 }} />
+        <Text style={styles.title}>Shift Details</Text>
       </View>
-      <ScrollView contentContainerStyle={{ padding: theme.spacing.lg, paddingBottom: 40 }}>
-        <View style={styles.heroCard}>
-          <Text style={styles.dateLabel}>{formatDate(s.start)}</Text>
-          <Text style={styles.timeText}>{formatShiftTime(s.start)} — {formatShiftTime(s.end)}</Text>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.hero}>
+          <Text style={styles.date}>{formatDate(s.start)}</Text>
+          <Text style={styles.time}>{formatShiftTime(s.start)} – {formatShiftTime(s.end)}</Text>
+          <Text style={styles.site}>{s.site?.name}</Text>
           <Text style={styles.role}>{s.role}</Text>
-          <View style={styles.metrics}>
-            <View><Text style={styles.metricLabel}>HOURS</Text><Text style={styles.metricValue}>{hrs}h</Text></View>
-            <View><Text style={styles.metricLabel}>RATE</Text><Text style={styles.metricValue}>{formatCurrency(s.pay_rate)}/hr</Text></View>
-            <View><Text style={styles.metricLabel}>EST.</Text><Text style={[styles.metricValue, { color: theme.colors.success }]}>{formatCurrency(hrs * s.pay_rate)}</Text></View>
-          </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>SITE</Text>
-          <Text style={styles.siteName}>{s.site?.name}</Text>
-          <Text style={styles.address}>{s.site?.address}</Text>
-          <Pressable
-            testID="navigate-btn"
-            onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(s.site?.address || "")}`)}
-            style={styles.navBtn}
-          >
-            <Ionicons name="navigate" size={16} color={theme.colors.onBrandPrimary} />
-            <Text style={styles.navBtnText}>OPEN IN MAPS</Text>
-          </Pressable>
+        <Text style={styles.groupLabel}>Details</Text>
+        <View style={styles.group}>
+          <Row label="Hours" value={`${hrs}h`} />
+          <Row label="Rate" value={`${formatCurrency(s.pay_rate)}/hr`} />
+          <Row label="Est. Earnings" value={formatCurrency(hrs * s.pay_rate)} last />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>SUPERVISOR</Text>
-          <View style={styles.supRow}>
-            <Text style={styles.supName}>{s.site?.supervisor}</Text>
-            <Pressable
-              testID="call-supervisor"
-              onPress={() => Linking.openURL(`tel:${s.site?.supervisor_phone}`)}
-              style={styles.callBtn}
-            >
-              <Ionicons name="call" size={14} color={theme.colors.brandPrimary} />
-              <Text style={styles.callText}>{s.site?.supervisor_phone}</Text>
-            </Pressable>
-          </View>
+        <Text style={styles.groupLabel}>Site</Text>
+        <View style={styles.group}>
+          <Row label="Address" value={s.site?.address} />
+          <Row label="Supervisor" value={s.site?.supervisor} last />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>SITE INSTRUCTIONS</Text>
+        <View style={{ marginTop: 14, gap: 10 }}>
+          <Button testID="navigate-btn" variant="secondary" label="Open in Maps"
+            onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(s.site?.address || "")}`)} />
+          <Button testID="call-supervisor" variant="secondary" label={`Call ${s.site?.supervisor}`}
+            onPress={() => Linking.openURL(`tel:${s.site?.supervisor_phone}`)} />
+        </View>
+
+        <Text style={styles.groupLabel}>Site Instructions</Text>
+        <View style={styles.instructionsCard}>
           <Text style={styles.instructions}>{s.site?.instructions}</Text>
-          {!s.instructions_acknowledged ? (
-            <Button testID="ack-instructions" label={acking ? "..." : "ACKNOWLEDGE INSTRUCTIONS"} onPress={ackInstructions}
-              disabled={acking} style={{ marginTop: theme.spacing.md }} />
-          ) : (
-            <View style={styles.ackBadge}>
-              <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
-              <Text style={styles.ackText}>Acknowledged</Text>
-            </View>
-          )}
         </View>
+
+        {!s.instructions_acknowledged ? (
+          <View style={{ marginTop: 14 }}>
+            <Button testID="ack-instructions" label={acking ? "…" : "Acknowledge Instructions"} onPress={ackInstructions} disabled={acking} />
+          </View>
+        ) : (
+          <Text style={styles.ackedText}>✓ Instructions acknowledged</Text>
+        )}
 
         {s.status === "scheduled" && (
-          <Button testID="clock-in-shift" label="GO TO TIME CLOCK"
-            onPress={() => router.push({ pathname: "/timeclock", params: { shift_id: s.id } })}
-            style={{ marginTop: theme.spacing.lg }} />
+          <View style={{ marginTop: 20 }}>
+            <Button testID="clock-in-shift" label="Go to Time Clock"
+              onPress={() => router.push({ pathname: "/timeclock", params: { shift_id: s.id } })} />
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function Row({ label, value, last }: any) {
+  return (
+    <View style={[styles.row, !last && styles.rowBorder]}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={styles.rowValue} numberOfLines={2}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.surface },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    padding: theme.spacing.lg, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  title: { color: theme.colors.onSurface, fontSize: 15, fontWeight: "800", letterSpacing: 2 },
-  heroCard: { backgroundColor: theme.colors.surfaceSecondary, padding: theme.spacing.xl,
-    borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.brandPrimary },
-  dateLabel: { color: theme.colors.brandPrimary, fontSize: 11, letterSpacing: 2, fontWeight: "800" },
-  timeText: { color: theme.colors.onSurface, fontSize: 26, fontWeight: "900", marginTop: 6 },
-  role: { color: theme.colors.brandPrimary, fontSize: 14, fontWeight: "700", marginTop: 4 },
-  metrics: { flexDirection: "row", justifyContent: "space-between", marginTop: theme.spacing.lg },
-  metricLabel: { color: theme.colors.onSurfaceTertiary, fontSize: 10, letterSpacing: 1.5, fontWeight: "700" },
-  metricValue: { color: theme.colors.onSurface, fontSize: 18, fontWeight: "800", marginTop: 2 },
-  section: { backgroundColor: theme.colors.surfaceSecondary, padding: theme.spacing.lg,
-    borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, marginTop: theme.spacing.md },
-  sectionLabel: { color: theme.colors.brandPrimary, fontSize: 11, letterSpacing: 1.5, fontWeight: "800", marginBottom: theme.spacing.sm },
-  siteName: { color: theme.colors.onSurface, fontSize: 16, fontWeight: "700" },
-  address: { color: theme.colors.onSurfaceSecondary, fontSize: 13, marginTop: 4 },
-  navBtn: { flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center",
-    backgroundColor: theme.colors.brandPrimary, padding: 10, borderRadius: theme.radius.md, marginTop: theme.spacing.md },
-  navBtnText: { color: theme.colors.onBrandPrimary, fontWeight: "800", letterSpacing: 1, fontSize: 12 },
-  supRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  supName: { color: theme.colors.onSurface, fontSize: 15, fontWeight: "700" },
-  callBtn: { flexDirection: "row", gap: 6, alignItems: "center", backgroundColor: theme.colors.brandTertiary,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.radius.sm },
-  callText: { color: theme.colors.brandPrimary, fontSize: 12, fontWeight: "700" },
-  instructions: { color: theme.colors.onSurfaceSecondary, fontSize: 13, lineHeight: 20 },
-  ackBadge: { flexDirection: "row", gap: 6, alignItems: "center", marginTop: theme.spacing.md,
-    padding: 8, backgroundColor: "rgba(16,185,129,0.1)", borderRadius: theme.radius.sm },
-  ackText: { color: theme.colors.success, fontSize: 12, fontWeight: "700" },
+  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
+  title: { color: theme.colors.text, fontSize: 20, fontWeight: "600" },
+  hero: { paddingVertical: 20 },
+  date: { color: theme.colors.textSecondary, fontSize: 13, textTransform: "uppercase", letterSpacing: 0.6 },
+  time: { color: theme.colors.text, fontSize: 26, fontWeight: "600", marginTop: 4, letterSpacing: -0.3 },
+  site: { color: theme.colors.text, fontSize: 17, marginTop: 10 },
+  role: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 2 },
+  groupLabel: { color: theme.colors.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6, marginTop: 20, marginBottom: 8, paddingHorizontal: 4 },
+  group: { backgroundColor: theme.colors.card, borderRadius: theme.radius.md, paddingHorizontal: 16 },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12 },
+  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
+  rowLabel: { color: theme.colors.text, fontSize: 15 },
+  rowValue: { color: theme.colors.textSecondary, fontSize: 14, maxWidth: "60%", textAlign: "right" },
+  instructionsCard: { backgroundColor: theme.colors.card, borderRadius: theme.radius.md, padding: 16 },
+  instructions: { color: theme.colors.text, fontSize: 14, lineHeight: 21 },
+  ackedText: { color: theme.colors.textSecondary, fontSize: 13, textAlign: "center", marginTop: 16 },
 });

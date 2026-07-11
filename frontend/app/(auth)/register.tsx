@@ -3,9 +3,8 @@ import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Scro
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { theme } from "@/src/theme";
-import { Button, Logo } from "@/src/ui";
+import { Button } from "@/src/ui";
 import { useAuth } from "@/src/auth/AuthContext";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function Register() {
   const { register } = useAuth();
@@ -32,44 +31,27 @@ export default function Register() {
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <View style={{ alignItems: "center", marginBottom: theme.spacing.xl }}>
-            <Logo size={54} />
-            <Text style={styles.title}>Start Onboarding</Text>
-            <Text style={styles.subtitle}>Create your guard account. Complete steps in-app after signup.</Text>
-          </View>
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.subtitle}>Complete remaining onboarding steps in-app after signup.</Text>
 
-          <View style={styles.card}>
-            <Text style={styles.label}>FULL NAME</Text>
-            <TextInput testID="register-name-input" value={name} onChangeText={setName} style={styles.input}
-              placeholder="Jane Doe" placeholderTextColor={theme.colors.onSurfaceTertiary} />
-            <Text style={styles.label}>EMAIL</Text>
-            <TextInput testID="register-email-input" value={email} onChangeText={setEmail} style={styles.input}
-              autoCapitalize="none" keyboardType="email-address"
-              placeholder="you@skyhawk.com" placeholderTextColor={theme.colors.onSurfaceTertiary} />
-            <Text style={styles.label}>PHONE (OPTIONAL)</Text>
-            <TextInput testID="register-phone-input" value={phone} onChangeText={setPhone} style={styles.input}
-              keyboardType="phone-pad"
-              placeholder="+1 416 555 0000" placeholderTextColor={theme.colors.onSurfaceTertiary} />
-            <Text style={styles.label}>PASSWORD</Text>
-            <TextInput testID="register-password-input" value={password} onChangeText={setPassword}
-              secureTextEntry style={styles.input}
-              placeholder="Minimum 6 characters" placeholderTextColor={theme.colors.onSurfaceTertiary} />
+          <Text style={styles.label}>Full Name</Text>
+          <TextInput testID="register-name-input" value={name} onChangeText={setName} style={styles.input} />
 
-            {error && (
-              <View style={styles.errorBox}>
-                <Ionicons name="alert-circle" size={16} color={theme.colors.error} />
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
+          <Text style={styles.label}>Email</Text>
+          <TextInput testID="register-email-input" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" style={styles.input} />
 
-            <Button testID="register-submit-button"
-              label={loading ? "CREATING..." : "CREATE ACCOUNT"}
-              onPress={submit} disabled={loading || !name || !email || !password}
-              style={{ marginTop: theme.spacing.xl }} />
+          <Text style={styles.label}>Phone (optional)</Text>
+          <TextInput testID="register-phone-input" value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={styles.input} />
 
-            <Button testID="back-to-login-btn" label="BACK TO LOGIN" variant="ghost"
-              onPress={() => router.back()} style={{ marginTop: theme.spacing.md }} />
+          <Text style={styles.label}>Password</Text>
+          <TextInput testID="register-password-input" value={password} onChangeText={setPassword} secureTextEntry style={styles.input} />
+
+          {error && <Text style={styles.error}>{error}</Text>}
+
+          <View style={{ marginTop: theme.spacing.xl, gap: 10 }}>
+            <Button testID="register-submit-button" label={loading ? "Creating…" : "Create Account"} onPress={submit} disabled={loading || !name || !email || !password} />
+            <Button testID="back-to-login-btn" label="Back to Login" variant="secondary" onPress={() => router.back()} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -78,17 +60,11 @@ export default function Register() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.surface },
-  container: { padding: theme.spacing.lg, paddingTop: theme.spacing.xl },
-  title: { fontSize: 22, fontWeight: "800", color: theme.colors.onSurface, marginTop: theme.spacing.md },
-  subtitle: { color: theme.colors.onSurfaceTertiary, fontSize: 13, marginTop: 4, textAlign: "center" },
-  card: { backgroundColor: theme.colors.surfaceSecondary, borderRadius: theme.radius.md, padding: theme.spacing.xl,
-    borderWidth: 1, borderColor: theme.colors.border },
-  label: { fontSize: 11, color: theme.colors.onSurfaceTertiary, letterSpacing: 1.5, marginBottom: 6, fontWeight: "700" },
-  input: { backgroundColor: theme.colors.surfaceTertiary, color: theme.colors.onSurface,
-    borderRadius: theme.radius.md, paddingHorizontal: theme.spacing.md, paddingVertical: 12,
-    fontSize: 15, marginBottom: theme.spacing.md, borderWidth: 1, borderColor: theme.colors.border },
-  errorBox: { flexDirection: "row", gap: 6, alignItems: "center", marginTop: theme.spacing.md,
-    padding: theme.spacing.md, backgroundColor: "rgba(239,68,68,0.1)", borderRadius: theme.radius.sm },
-  errorText: { color: theme.colors.error, fontSize: 13, flex: 1 },
+  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  container: { padding: 24, paddingTop: 40 },
+  title: { color: theme.colors.text, fontSize: 28, fontWeight: "700" },
+  subtitle: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 6, marginBottom: 20 },
+  label: { color: theme.colors.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6, marginTop: 14 },
+  input: { backgroundColor: theme.colors.card, color: theme.colors.text, borderRadius: theme.radius.md, padding: 14, fontSize: 16 },
+  error: { color: theme.colors.error, fontSize: 13, marginTop: 12, textAlign: "center" },
 });

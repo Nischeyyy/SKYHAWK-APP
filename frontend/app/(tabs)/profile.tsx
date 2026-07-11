@@ -4,7 +4,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/src/theme";
-import { Button } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
 
@@ -21,148 +20,108 @@ export default function Profile() {
     } catch {}
     setLoading(false);
   }, []);
-
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   if (loading) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <ActivityIndicator color={theme.colors.brandPrimary} style={{ marginTop: 40 }} />
-      </SafeAreaView>
-    );
+    return <SafeAreaView style={styles.safe}><ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} /></SafeAreaView>;
   }
+
   const u = data?.user || user;
   const eq = data?.equipment || [];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView contentContainerStyle={{ padding: theme.spacing.lg, paddingBottom: 100 }}>
-        <View style={styles.profileHead}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarInit}>
-              {u?.full_name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-            </Text>
-          </View>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
           <Text style={styles.name}>{u?.full_name}</Text>
-          <Text style={styles.role}>{u?.employment_status}</Text>
-          <View style={styles.empNumBox}>
-            <Text style={styles.empNumLabel}>EMPLOYEE #</Text>
-            <Text style={styles.empNum}>{u?.employee_number}</Text>
-          </View>
+          <Text style={styles.subtitle}>{u?.employment_status} · {u?.employee_number}</Text>
         </View>
 
-        <Section title="CONTACT">
-          <Row label="Email" value={u?.email} />
-          <Row label="Phone" value={u?.phone || "—"} />
-        </Section>
+        <Group>
+          <Row label="Email" value={u?.email} last={!u?.phone} />
+          {u?.phone && <Row label="Phone" value={u.phone} last />}
+        </Group>
 
-        <Section title="CREDENTIALS">
-          <Row label="Licence #" value={u?.licence_number || "—"} />
-          <Row label="Licence Expiry" value={u?.licence_expiry ? new Date(u.licence_expiry).toLocaleDateString() : "—"} />
-          <Row label="Certifications" value={(u?.certifications || []).join(", ") || "—"} />
-        </Section>
+        <Text style={styles.groupLabel}>Credentials</Text>
+        <Group>
+          <Row label="Licence" value={u?.licence_number || "—"} />
+          <Row label="Expiry" value={u?.licence_expiry ? new Date(u.licence_expiry).toLocaleDateString() : "—"} />
+          <Row label="Certifications" value={`${(u?.certifications || []).length}`} last />
+        </Group>
 
         {u?.emergency_contact && (
-          <Section title="EMERGENCY CONTACT">
-            <Row label="Name" value={u.emergency_contact.name} />
-            <Row label="Phone" value={u.emergency_contact.phone} />
-            <Row label="Relation" value={u.emergency_contact.relation} />
-          </Section>
+          <>
+            <Text style={styles.groupLabel}>Emergency Contact</Text>
+            <Group>
+              <Row label="Name" value={u.emergency_contact.name} />
+              <Row label="Phone" value={u.emergency_contact.phone} />
+              <Row label="Relation" value={u.emergency_contact.relation} last />
+            </Group>
+          </>
         )}
 
-        <Section title="EQUIPMENT ASSIGNED">
-          {eq.length === 0 && <Text style={styles.emptyRow}>None issued</Text>}
-          {eq.map((e: any) => (
-            <View key={e.id} testID={`equipment-${e.type}`} style={styles.equipRow}>
-              <Ionicons name={equipIcon(e.type)} size={16} color={theme.colors.brandPrimary} />
-              <Text style={styles.equipDesc}>{e.description}</Text>
-              <View style={styles.equipStatus}>
-                <Text style={styles.equipStatusText}>{e.status}</Text>
-              </View>
-            </View>
-          ))}
-        </Section>
+        {eq.length > 0 && (
+          <>
+            <Text style={styles.groupLabel}>Equipment</Text>
+            <Group>
+              {eq.map((e: any, i: number) => (
+                <Row key={e.id} testID={`equipment-${e.type}`} label={e.type[0].toUpperCase() + e.type.slice(1)} value={e.description} last={i === eq.length - 1} />
+              ))}
+            </Group>
+          </>
+        )}
 
-        <View style={{ marginTop: theme.spacing.xl, gap: theme.spacing.sm }}>
-          <Pressable testID="go-onboarding" onPress={() => router.push("/onboarding")} style={styles.linkBtn}>
-            <Ionicons name="school" size={18} color={theme.colors.brandPrimary} />
-            <Text style={styles.linkText}>Onboarding Progress</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.onSurfaceTertiary} />
-          </Pressable>
-          <Pressable testID="go-payroll" onPress={() => router.push("/payroll")} style={styles.linkBtn}>
-            <Ionicons name="cash" size={18} color={theme.colors.brandPrimary} />
-            <Text style={styles.linkText}>Payroll & Pay Stubs</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.onSurfaceTertiary} />
-          </Pressable>
-          <Pressable testID="go-incidents" onPress={() => router.push("/incidents")} style={styles.linkBtn}>
-            <Ionicons name="warning" size={18} color={theme.colors.brandPrimary} />
-            <Text style={styles.linkText}>My Incident Reports</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.onSurfaceTertiary} />
-          </Pressable>
-        </View>
+        <Text style={styles.groupLabel}>More</Text>
+        <Group>
+          <NavRow icon="school-outline" label="Onboarding" onPress={() => router.push("/onboarding")} testID="go-onboarding" />
+          <NavRow icon="cash-outline" label="Payroll" onPress={() => router.push("/payroll")} testID="go-payroll" />
+          <NavRow icon="warning-outline" label="Incident Reports" onPress={() => router.push("/incidents")} testID="go-incidents" last />
+        </Group>
 
-        <Button testID="logout-btn" label="LOG OUT" variant="ghost" onPress={logout} style={{ marginTop: theme.spacing.xl }} />
+        <Pressable testID="logout-btn" onPress={logout} style={styles.logoutBtn}>
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function equipIcon(type: string): any {
-  const map: any = { uniform: "shirt", radio: "radio", keys: "key", parking: "car" };
-  return map[type] || "cube";
+function Group({ children }: any) {
+  return <View style={styles.group}>{children}</View>;
 }
 
-function Section({ title, children }: any) {
+function Row({ label, value, last, testID }: any) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{title}</Text>
-      {children}
+    <View testID={testID} style={[styles.row, !last && styles.rowBorder]}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={styles.rowValue} numberOfLines={1}>{value}</Text>
     </View>
   );
 }
 
-function Row({ label, value }: any) {
+function NavRow({ icon, label, onPress, last, testID }: any) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
-    </View>
+    <Pressable testID={testID} onPress={onPress} style={[styles.navRow, !last && styles.rowBorder]}>
+      <Ionicons name={icon} size={19} color={theme.colors.text} style={{ marginRight: 12 }} />
+      <Text style={styles.navLabel}>{label}</Text>
+      <Ionicons name="chevron-forward" size={16} color={theme.colors.textTertiary} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.surface },
-  profileHead: { alignItems: "center", paddingVertical: theme.spacing.xl },
-  avatar: {
-    width: 84, height: 84, borderRadius: 42, backgroundColor: theme.colors.brandPrimary,
-    alignItems: "center", justifyContent: "center",
-  },
-  avatarInit: { color: theme.colors.onBrandPrimary, fontSize: 30, fontWeight: "900" },
-  name: { color: theme.colors.onSurface, fontSize: 22, fontWeight: "800", marginTop: theme.spacing.md },
-  role: { color: theme.colors.onSurfaceTertiary, fontSize: 13, marginTop: 4 },
-  empNumBox: { marginTop: theme.spacing.md, alignItems: "center" },
-  empNumLabel: { color: theme.colors.onSurfaceTertiary, fontSize: 10, letterSpacing: 2, fontWeight: "700" },
-  empNum: { color: theme.colors.brandPrimary, fontSize: 16, fontWeight: "800", fontFamily: "monospace" },
-  section: {
-    backgroundColor: theme.colors.surfaceSecondary, borderRadius: theme.radius.md,
-    padding: theme.spacing.lg, marginTop: theme.spacing.md,
-    borderWidth: 1, borderColor: theme.colors.border,
-  },
-  sectionLabel: { color: theme.colors.brandPrimary, fontSize: 11, fontWeight: "800", letterSpacing: 1.5, marginBottom: theme.spacing.md },
-  row: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
-  rowLabel: { color: theme.colors.onSurfaceTertiary, fontSize: 13 },
-  rowValue: { color: theme.colors.onSurface, fontSize: 13, fontWeight: "600", maxWidth: "60%", textAlign: "right" },
-  emptyRow: { color: theme.colors.onSurfaceTertiary, fontStyle: "italic" },
-  equipRow: {
-    flexDirection: "row", alignItems: "center", gap: theme.spacing.sm, paddingVertical: 8,
-  },
-  equipDesc: { color: theme.colors.onSurface, fontSize: 13, flex: 1 },
-  equipStatus: { backgroundColor: theme.colors.brandTertiary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  equipStatusText: { color: theme.colors.brandPrimary, fontSize: 10, fontWeight: "700" },
-  linkBtn: {
-    flexDirection: "row", alignItems: "center", gap: theme.spacing.md,
-    backgroundColor: theme.colors.surfaceSecondary, padding: theme.spacing.md,
-    borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border,
-  },
-  linkText: { color: theme.colors.onSurface, fontSize: 14, fontWeight: "600", flex: 1 },
+  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  header: { paddingTop: 20, paddingBottom: 20 },
+  name: { color: theme.colors.text, fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
+  subtitle: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 4 },
+  groupLabel: { color: theme.colors.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6, marginTop: 24, marginBottom: 6, paddingHorizontal: 4 },
+  group: { backgroundColor: theme.colors.card, borderRadius: theme.radius.md, paddingHorizontal: 16 },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12 },
+  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
+  rowLabel: { color: theme.colors.text, fontSize: 15 },
+  rowValue: { color: theme.colors.textSecondary, fontSize: 15, maxWidth: "55%", textAlign: "right" },
+  navRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
+  navLabel: { color: theme.colors.text, fontSize: 15, flex: 1 },
+  logoutBtn: { marginTop: 32, paddingVertical: 14, alignItems: "center" },
+  logoutText: { color: theme.colors.error, fontSize: 15 },
 });

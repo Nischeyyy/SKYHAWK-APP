@@ -1,61 +1,46 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/src/theme";
-import { Platform, View } from "react-native";
+import { Platform } from "react-native";
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.brandPrimary,
-        tabBarInactiveTintColor: theme.colors.onSurfaceTertiary,
+        tabBarActiveTintColor: theme.colors.text,
+        tabBarInactiveTintColor: theme.colors.textTertiary,
         tabBarStyle: {
-          backgroundColor: theme.colors.surfaceSecondary,
-          borderTopColor: theme.colors.border,
-          borderTopWidth: 1,
-          height: Platform.OS === "ios" ? 88 : 68,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === "ios" ? 28 : 10,
+          backgroundColor: theme.colors.bg,
+          borderTopColor: theme.colors.divider,
+          borderTopWidth: 0.5,
+          height: Platform.OS === "ios" ? 84 : 62,
+          paddingTop: 6,
+          paddingBottom: Platform.OS === "ios" ? 26 : 8,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600", letterSpacing: 0.5 },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "500" },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, size }) => <Ionicons name="grid" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="schedule"
-        options={{
-          title: "Schedule",
-          tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="shifts"
-        options={{
-          title: "Shifts",
-          tabBarIcon: ({ color, size }) => <Ionicons name="briefcase" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="wallet"
-        options={{
-          title: "Wallet",
-          tabBarIcon: ({ color, size }) => <Ionicons name="card" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-circle" size={size} color={color} />,
-        }}
-      />
+      <Tabs.Screen name="index" options={{
+        title: "Today",
+        tabBarIcon: ({ color }) => <Ionicons name="today-outline" size={22} color={color} />,
+      }} />
+      <Tabs.Screen name="schedule" options={{
+        title: "Schedule",
+        tabBarIcon: ({ color }) => <Ionicons name="calendar-outline" size={22} color={color} />,
+      }} />
+      <Tabs.Screen name="shifts" options={{
+        title: "Shifts",
+        tabBarIcon: ({ color }) => <Ionicons name="list-outline" size={22} color={color} />,
+      }} />
+      <Tabs.Screen name="wallet" options={{
+        title: "Wallet",
+        tabBarIcon: ({ color }) => <Ionicons name="card-outline" size={22} color={color} />,
+      }} />
+      <Tabs.Screen name="profile" options={{
+        title: "Profile",
+        tabBarIcon: ({ color }) => <Ionicons name="person-outline" size={22} color={color} />,
+      }} />
     </Tabs>
   );
 }

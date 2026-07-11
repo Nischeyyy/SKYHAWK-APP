@@ -7,12 +7,12 @@ import { theme } from "@/src/theme";
 import { api } from "@/src/api/client";
 
 const STEPS = [
-  { key: "documents_uploaded", label: "Upload ID Documents", icon: "document" },
-  { key: "sin_submitted", label: "Submit SIN", icon: "keypad" },
-  { key: "direct_deposit_submitted", label: "Direct Deposit Info", icon: "card" },
-  { key: "emergency_contact_added", label: "Emergency Contact", icon: "call" },
-  { key: "agreements_signed", label: "Sign Employment Agreements", icon: "create" },
-  { key: "training_complete", label: "Complete Training Modules", icon: "school" },
+  { key: "documents_uploaded", label: "Upload ID Documents" },
+  { key: "sin_submitted", label: "Submit SIN" },
+  { key: "direct_deposit_submitted", label: "Direct Deposit Info" },
+  { key: "emergency_contact_added", label: "Emergency Contact" },
+  { key: "agreements_signed", label: "Sign Employment Agreements" },
+  { key: "training_complete", label: "Complete Training" },
 ];
 
 export default function Onboarding() {
@@ -29,9 +29,7 @@ export default function Onboarding() {
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  if (loading) {
-    return <SafeAreaView style={styles.safe}><ActivityIndicator color={theme.colors.brandPrimary} style={{ marginTop: 40 }} /></SafeAreaView>;
-  }
+  if (loading) return <SafeAreaView style={styles.safe}><ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} /></SafeAreaView>;
 
   const status = data?.status || {};
   const pct = data?.percent || 0;
@@ -39,83 +37,55 @@ export default function Onboarding() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="arrow-back" size={22} color={theme.colors.onSurface} />
+        <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }}>
+          <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
         </Pressable>
-        <Text style={styles.title}>ONBOARDING</Text>
-        <View style={{ width: 22 }} />
+        <Text style={styles.title}>Onboarding</Text>
       </View>
-      <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
-        <View style={styles.progressCard}>
-          <Text style={styles.progressLabel}>YOUR PROGRESS</Text>
-          <View style={styles.progressRow}>
-            <Text style={styles.progressValue}>{pct}%</Text>
-            <Text style={styles.progressSteps}>{data?.completed} of {data?.total} steps</Text>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.progressWrap}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.percent}>{pct}%</Text>
+            <Text style={styles.steps}>{data?.completed} of {data?.total} steps</Text>
           </View>
           <View style={styles.progressBar}>
             <View style={[styles.progressFill, { width: `${pct}%` }]} />
           </View>
-          {pct === 100 && (
-            <View style={styles.doneBadge}>
-              <Ionicons name="checkmark-circle" size={18} color={theme.colors.success} />
-              <Text style={styles.doneText}>All steps complete — ready for duty</Text>
-            </View>
-          )}
         </View>
 
-        <Text style={styles.stepsLabel}>STEPS</Text>
-        {STEPS.map((s, i) => {
-          const done = status[s.key];
-          return (
-            <View key={s.key} testID={`step-${s.key}`} style={[styles.stepRow, done && styles.stepRowDone]}>
-              <View style={[styles.stepIcon, done && styles.stepIconDone]}>
-                <Ionicons name={done ? "checkmark" : (s.icon as any)} size={18}
-                  color={done ? theme.colors.onBrandPrimary : theme.colors.brandPrimary} />
+        <View style={styles.stepsList}>
+          {STEPS.map((s, i) => {
+            const done = status[s.key];
+            return (
+              <View key={s.key} testID={`step-${s.key}`} style={[styles.stepRow, i < STEPS.length - 1 && styles.stepRowBorder]}>
+                <View style={[styles.check, done && styles.checkDone]}>
+                  {done && <Ionicons name="checkmark" size={13} color={theme.colors.bg} />}
+                </View>
+                <Text style={[styles.stepText, done && styles.stepTextDone]}>{s.label}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.stepIndex}>STEP {i + 1}</Text>
-                <Text style={styles.stepLabel}>{s.label}</Text>
-              </View>
-              {done ? (
-                <Text style={styles.stepDone}>DONE</Text>
-              ) : (
-                <Ionicons name="chevron-forward" size={16} color={theme.colors.onSurfaceTertiary} />
-              )}
-            </View>
-          );
-        })}
+            );
+          })}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.surface },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    padding: theme.spacing.lg, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  title: { color: theme.colors.onSurface, fontSize: 15, fontWeight: "800", letterSpacing: 2 },
-  progressCard: { backgroundColor: theme.colors.surfaceSecondary, padding: theme.spacing.xl,
-    borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border },
-  progressLabel: { color: theme.colors.brandPrimary, fontSize: 11, letterSpacing: 2, fontWeight: "800" },
-  progressRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 8 },
-  progressValue: { color: theme.colors.onSurface, fontSize: 44, fontWeight: "900", letterSpacing: -1 },
-  progressSteps: { color: theme.colors.onSurfaceTertiary, fontSize: 13, marginBottom: 8 },
-  progressBar: { height: 8, backgroundColor: theme.colors.surfaceTertiary, borderRadius: 4, marginTop: 12, overflow: "hidden" },
-  progressFill: { height: "100%", backgroundColor: theme.colors.brandPrimary },
-  doneBadge: { flexDirection: "row", gap: 6, alignItems: "center", marginTop: theme.spacing.md,
-    padding: 8, backgroundColor: "rgba(16,185,129,0.1)", borderRadius: theme.radius.sm },
-  doneText: { color: theme.colors.success, fontSize: 12, fontWeight: "700" },
-  stepsLabel: { color: theme.colors.onSurfaceTertiary, fontSize: 11, letterSpacing: 1.5, fontWeight: "800",
-    marginTop: theme.spacing.xl, marginBottom: theme.spacing.md },
-  stepRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md,
-    padding: theme.spacing.md, backgroundColor: theme.colors.surfaceSecondary,
-    borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border,
-    marginBottom: theme.spacing.sm },
-  stepRowDone: { borderColor: theme.colors.brandTertiary },
-  stepIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.brandTertiary,
-    alignItems: "center", justifyContent: "center" },
-  stepIconDone: { backgroundColor: theme.colors.brandPrimary },
-  stepIndex: { color: theme.colors.onSurfaceTertiary, fontSize: 10, letterSpacing: 1.5, fontWeight: "700" },
-  stepLabel: { color: theme.colors.onSurface, fontSize: 14, fontWeight: "700", marginTop: 2 },
-  stepDone: { color: theme.colors.success, fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
+  title: { color: theme.colors.text, fontSize: 20, fontWeight: "600" },
+  progressWrap: { paddingVertical: 20 },
+  progressHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 },
+  percent: { color: theme.colors.text, fontSize: 40, fontWeight: "700", letterSpacing: -1 },
+  steps: { color: theme.colors.textSecondary, fontSize: 14 },
+  progressBar: { height: 4, backgroundColor: theme.colors.card, borderRadius: 2, overflow: "hidden" },
+  progressFill: { height: "100%", backgroundColor: theme.colors.text },
+  stepsList: { backgroundColor: theme.colors.card, borderRadius: theme.radius.md, paddingHorizontal: 16, marginTop: 20 },
+  stepRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
+  stepRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
+  check: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, alignItems: "center", justifyContent: "center", marginRight: 14 },
+  checkDone: { backgroundColor: theme.colors.text, borderColor: theme.colors.text },
+  stepText: { color: theme.colors.textSecondary, fontSize: 15 },
+  stepTextDone: { color: theme.colors.text },
 });

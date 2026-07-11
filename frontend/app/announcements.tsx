@@ -28,57 +28,39 @@ export default function Announcements() {
     } catch {}
   };
 
-  const sevColor = (s: string) =>
-    s === "critical" ? theme.colors.error :
-    s === "warning" ? theme.colors.warning : theme.colors.info;
-
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12}>
-          <Ionicons name="arrow-back" size={22} color={theme.colors.onSurface} />
+        <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }}>
+          <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
         </Pressable>
-        <Text style={styles.title}>ANNOUNCEMENTS</Text>
-        <View style={{ width: 22 }} />
+        <Text style={styles.title}>Announcements</Text>
       </View>
-
       {loading ? (
-        <ActivityIndicator color={theme.colors.brandPrimary} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: theme.spacing.lg, paddingBottom: 40 }}>
-          {items.length === 0 && (
-            <Text style={{ color: theme.colors.onSurfaceTertiary, textAlign: "center", marginTop: 40 }}>
-              No announcements
-            </Text>
-          )}
-          {items.map((a) => (
-            <View key={a.id} testID={`ann-${a.id}`} style={[styles.card, !a.read && styles.cardUnread]}>
-              <View style={styles.cardHead}>
-                <View style={[styles.sevBadge, { backgroundColor: sevColor(a.severity) + "22", borderColor: sevColor(a.severity) }]}>
-                  <Ionicons name={a.severity === "critical" ? "alert-circle" : a.severity === "warning" ? "warning" : "information-circle"}
-                    size={12} color={sevColor(a.severity)} />
-                  <Text style={[styles.sevText, { color: sevColor(a.severity) }]}>{a.severity.toUpperCase()}</Text>
-                </View>
-                <Text style={styles.time}>{relativeTime(a.posted_at)}</Text>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+          {items.length === 0 && <Text style={styles.empty}>No announcements</Text>}
+          {items.map((a, i) => (
+            <View key={a.id} testID={`ann-${a.id}`} style={[styles.item, i < items.length - 1 && styles.itemBorder]}>
+              <View style={styles.metaRow}>
+                {!a.read && <View style={styles.unreadDot} />}
+                <Text style={styles.postedBy}>{a.posted_by}</Text>
+                <Text style={styles.time}>· {relativeTime(a.posted_at)}</Text>
+                {a.severity === "critical" && <Text style={styles.critical}>Critical</Text>}
               </View>
               <Text style={styles.annTitle}>{a.title}</Text>
               <Text style={styles.annBody}>{a.body}</Text>
-              <View style={styles.footerRow}>
-                <Text style={styles.postedBy}>{a.posted_by}</Text>
+              <View style={styles.footer}>
                 <Text style={styles.readCount}>{a.read_count} read</Text>
+                {!a.read ? (
+                  <Pressable testID={`ack-${a.id}`} onPress={() => ack(a.id)} hitSlop={8}>
+                    <Text style={styles.ackText}>Mark as Read</Text>
+                  </Pressable>
+                ) : (
+                  <Text style={styles.readBadge}>✓ Read</Text>
+                )}
               </View>
-              {!a.read && (
-                <Pressable testID={`ack-${a.id}`} onPress={() => ack(a.id)} style={styles.ackBtn}>
-                  <Ionicons name="checkmark" size={16} color={theme.colors.onBrandPrimary} />
-                  <Text style={styles.ackText}>ACKNOWLEDGE</Text>
-                </Pressable>
-              )}
-              {a.read && (
-                <View style={styles.readBadge}>
-                  <Ionicons name="checkmark-circle" size={14} color={theme.colors.success} />
-                  <Text style={styles.readText}>Acknowledged</Text>
-                </View>
-              )}
             </View>
           ))}
         </ScrollView>
@@ -88,36 +70,21 @@ export default function Announcements() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.surface },
-  header: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    padding: theme.spacing.lg, borderBottomWidth: 1, borderBottomColor: theme.colors.border,
-  },
-  title: { color: theme.colors.onSurface, fontSize: 15, fontWeight: "800", letterSpacing: 2 },
-  card: {
-    backgroundColor: theme.colors.surfaceSecondary, padding: theme.spacing.lg,
-    borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border,
-    marginBottom: theme.spacing.md,
-  },
-  cardUnread: { borderColor: theme.colors.brandPrimary, borderLeftWidth: 3 },
-  cardHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  sevBadge: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1,
-  },
-  sevText: { fontSize: 10, fontWeight: "800", letterSpacing: 1 },
-  time: { color: theme.colors.onSurfaceTertiary, fontSize: 11 },
-  annTitle: { color: theme.colors.onSurface, fontSize: 16, fontWeight: "800", marginTop: theme.spacing.sm },
-  annBody: { color: theme.colors.onSurfaceSecondary, fontSize: 13, marginTop: 6, lineHeight: 19 },
-  footerRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 },
-  postedBy: { color: theme.colors.onSurfaceTertiary, fontSize: 11 },
-  readCount: { color: theme.colors.onSurfaceTertiary, fontSize: 11 },
-  ackBtn: {
-    marginTop: theme.spacing.md, backgroundColor: theme.colors.brandPrimary,
-    padding: 12, borderRadius: theme.radius.md, flexDirection: "row",
-    justifyContent: "center", alignItems: "center", gap: 6,
-  },
-  ackText: { color: theme.colors.onBrandPrimary, fontWeight: "800", letterSpacing: 1 },
-  readBadge: { flexDirection: "row", gap: 6, alignItems: "center", marginTop: theme.spacing.md },
-  readText: { color: theme.colors.success, fontSize: 12, fontWeight: "600" },
+  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 16 },
+  title: { color: theme.colors.text, fontSize: 20, fontWeight: "600" },
+  item: { paddingVertical: 18 },
+  itemBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.text },
+  postedBy: { color: theme.colors.textSecondary, fontSize: 13 },
+  time: { color: theme.colors.textSecondary, fontSize: 13 },
+  critical: { color: theme.colors.error, fontSize: 12, marginLeft: 6, fontWeight: "600" },
+  annTitle: { color: theme.colors.text, fontSize: 17, fontWeight: "600", marginTop: 8 },
+  annBody: { color: theme.colors.text, fontSize: 15, marginTop: 6, lineHeight: 21 },
+  footer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 14 },
+  readCount: { color: theme.colors.textTertiary, fontSize: 13 },
+  ackText: { color: theme.colors.text, fontSize: 14, fontWeight: "500" },
+  readBadge: { color: theme.colors.textTertiary, fontSize: 13 },
+  empty: { color: theme.colors.textSecondary, textAlign: "center", marginTop: 60, fontSize: 15 },
 });

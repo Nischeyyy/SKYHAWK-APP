@@ -2,9 +2,7 @@ import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@/src/theme";
-import { Chip } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { formatShiftTime, formatDate } from "@/src/utils/format";
 
@@ -25,7 +23,6 @@ export default function Schedule() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  // Group by date
   const grouped: Record<string, any[]> = {};
   (data?.shifts || []).forEach((s: any) => {
     const day = new Date(s.start).toDateString();
@@ -36,57 +33,54 @@ export default function Schedule() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.title}>MY SCHEDULE</Text>
-        <View style={styles.chipsRow}>
-          <Chip testID="range-week" label="Week" active={range === "week"} onPress={() => setRange("week")} />
-          <Chip testID="range-month" label="Month" active={range === "month"} onPress={() => setRange("month")} />
+        <Text style={styles.title}>Schedule</Text>
+        <View style={styles.segmented}>
+          <Pressable
+            testID="range-week"
+            onPress={() => setRange("week")}
+            style={[styles.segBtn, range === "week" && styles.segActive]}
+          >
+            <Text style={[styles.segText, range === "week" && styles.segTextActive]}>Week</Text>
+          </Pressable>
+          <Pressable
+            testID="range-month"
+            onPress={() => setRange("month")}
+            style={[styles.segBtn, range === "month" && styles.segActive]}
+          >
+            <Text style={[styles.segText, range === "month" && styles.segTextActive]}>Month</Text>
+          </Pressable>
         </View>
       </View>
 
       {loading ? (
-        <ActivityIndicator color={theme.colors.brandPrimary} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView
-          contentContainerStyle={{ padding: theme.spacing.lg, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={theme.colors.brandPrimary} />}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={theme.colors.textSecondary} />}
+          showsVerticalScrollIndicator={false}
         >
           {Object.keys(grouped).length === 0 && (
-            <View style={styles.empty}>
-              <Ionicons name="calendar-outline" size={40} color={theme.colors.onSurfaceTertiary} />
-              <Text style={styles.emptyText}>No shifts in this range</Text>
-            </View>
+            <Text style={styles.empty}>No shifts in this range</Text>
           )}
           {Object.entries(grouped).map(([day, shifts]) => (
-            <View key={day} style={{ marginBottom: theme.spacing.lg }}>
+            <View key={day} style={styles.dayGroup}>
               <Text style={styles.dayLabel}>{formatDate(shifts[0].start)}</Text>
-              {shifts.map((s: any) => (
+              {shifts.map((s: any, i: number) => (
                 <Pressable
                   key={s.id}
                   testID={`shift-item-${s.id}`}
                   onPress={() => router.push({ pathname: "/shift/[id]", params: { id: s.id } })}
-                  style={styles.shiftCard}
+                  style={[styles.shiftRow, i < shifts.length - 1 && styles.shiftRowBorder]}
                 >
-                  <View style={styles.timeBadge}>
-                    <Text style={styles.timeText}>{formatShiftTime(s.start).replace(/\s/g, "")}</Text>
-                    <Text style={styles.timeDivider}>→</Text>
-                    <Text style={styles.timeText}>{formatShiftTime(s.end).replace(/\s/g, "")}</Text>
-                  </View>
                   <View style={{ flex: 1 }}>
+                    <Text style={styles.shiftTime}>{formatShiftTime(s.start)} – {formatShiftTime(s.end)}</Text>
+                    <Text style={styles.shiftSite}>{s.site?.name}</Text>
                     <Text style={styles.shiftRole}>{s.role}</Text>
-                    <Text style={styles.siteName}>{s.site?.name}</Text>
-                    <View style={styles.statusRow}>
-                      <View style={[styles.statusDot, { backgroundColor: s.status === "completed" ? theme.colors.success : theme.colors.brandPrimary }]} />
-                      <Text style={styles.statusText}>{s.status}</Text>
-                      {s.instructions_acknowledged && (
-                        <>
-                          <Text style={styles.dot}>·</Text>
-                          <Ionicons name="checkmark-circle" size={12} color={theme.colors.success} />
-                          <Text style={styles.statusText}>ack'd</Text>
-                        </>
-                      )}
-                    </View>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={theme.colors.onSurfaceTertiary} />
+                  {s.status === "completed" ? (
+                    <Text style={styles.completedText}>Completed</Text>
+                  ) : null}
                 </Pressable>
               ))}
             </View>
@@ -98,30 +92,21 @@ export default function Schedule() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.surface },
-  header: { paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.md,
-    borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  title: { color: theme.colors.onSurface, fontSize: 22, fontWeight: "800", marginBottom: theme.spacing.md },
-  chipsRow: { flexDirection: "row", gap: 8 },
-  dayLabel: { color: theme.colors.brandPrimary, fontSize: 11, fontWeight: "700", letterSpacing: 1.5, marginBottom: theme.spacing.sm },
-  shiftCard: {
-    flexDirection: "row", alignItems: "center", gap: theme.spacing.md,
-    backgroundColor: theme.colors.surfaceSecondary, padding: theme.spacing.md,
-    borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border,
-    marginBottom: theme.spacing.sm,
-  },
-  timeBadge: {
-    backgroundColor: theme.colors.surfaceTertiary, paddingHorizontal: 10, paddingVertical: 8,
-    borderRadius: theme.radius.sm, alignItems: "center", minWidth: 70,
-  },
-  timeText: { color: theme.colors.onSurface, fontSize: 11, fontWeight: "700" },
-  timeDivider: { color: theme.colors.onSurfaceTertiary, fontSize: 10, marginVertical: 1 },
-  shiftRole: { color: theme.colors.onSurface, fontSize: 15, fontWeight: "700" },
-  siteName: { color: theme.colors.onSurfaceSecondary, fontSize: 13, marginTop: 2 },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { color: theme.colors.onSurfaceTertiary, fontSize: 11, textTransform: "capitalize" },
-  dot: { color: theme.colors.onSurfaceTertiary, marginHorizontal: 2 },
-  empty: { alignItems: "center", padding: theme.spacing.xxxl },
-  emptyText: { color: theme.colors.onSurfaceTertiary, marginTop: theme.spacing.md, fontSize: 14 },
+  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 },
+  title: { color: theme.colors.text, fontSize: 32, fontWeight: "700", letterSpacing: -0.5, marginBottom: 14 },
+  segmented: { flexDirection: "row", backgroundColor: theme.colors.card, borderRadius: theme.radius.md, padding: 3 },
+  segBtn: { flex: 1, paddingVertical: 7, alignItems: "center", borderRadius: theme.radius.sm },
+  segActive: { backgroundColor: theme.colors.cardAlt },
+  segText: { color: theme.colors.textSecondary, fontSize: 13, fontWeight: "500" },
+  segTextActive: { color: theme.colors.text },
+  dayGroup: { marginTop: 22 },
+  dayLabel: { color: theme.colors.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 },
+  shiftRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
+  shiftRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
+  shiftTime: { color: theme.colors.text, fontSize: 16, fontWeight: "500" },
+  shiftSite: { color: theme.colors.text, fontSize: 15, marginTop: 4 },
+  shiftRole: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 2 },
+  completedText: { color: theme.colors.textTertiary, fontSize: 12 },
+  empty: { color: theme.colors.textSecondary, textAlign: "center", marginTop: 60, fontSize: 15 },
 });
