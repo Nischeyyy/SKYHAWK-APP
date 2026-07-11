@@ -10,15 +10,26 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.opsclockin.eakz76"
+      "bundleIdentifier": "com.emergent.opsclockin.eakz76",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Verify identity with selfie at clock-in",
+        "NSLocationWhenInUseUsageDescription": "Verify shift location at clock-in",
+        "NSPhotoLibraryUsageDescription": "Attach photos to incident reports"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#0F172A"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.opsclockin.eakz76"
+      "package": "com.emergent.opsclockin.eakz76",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -33,9 +44,28 @@
           "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#0F172A"
         }
-      ]
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Verify identity with selfie at clock-in"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Verify shift location at clock-in"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Attach photos to incident reports"
+        }
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true
