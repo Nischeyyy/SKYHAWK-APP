@@ -46,9 +46,15 @@ function AuthGate() {
   useEffect(() => {
     if (loading) return;
     const inAuthGroup = segments[0] === "(auth)";
+    const inManagerGroup = segments[0] === "(manager)";
+    const inTabsGroup = segments[0] === "(tabs)";
     if (!user && !inAuthGroup) {
       router.replace("/(auth)/login");
     } else if (user && inAuthGroup) {
+      router.replace(user.role === "admin" ? "/(manager)" : "/(tabs)");
+    } else if (user && user.role === "admin" && inTabsGroup) {
+      router.replace("/(manager)");
+    } else if (user && user.role !== "admin" && inManagerGroup) {
       router.replace("/(tabs)");
     }
   }, [user, loading, segments, router]);

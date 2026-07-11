@@ -969,6 +969,506 @@ async def register_push(body: RegisterPushIn):
     return {"status": "registered"}
 
 
+
+# ============================================================
+# ADMIN — Dependency & Models
+# ============================================================
+
+async def require_admin(user=Depends(get_current_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin access required")
+    return user
+
+
+class AdminCreateGuardIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    full_name: str
+    phone: Optional[str] = None
+    employee_number: Optional[str] = None
+    licence_number: Optional[str] = None
+    licence_expiry: Optional[str] = None
+    certifications: List[str] = []
+    employment_status: str = "Active - Full Time"
+
+
+class AdminUpdateGuardIn(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    employee_number: Optional[str] = None
+    licence_number: Optional[str] = None
+    licence_expiry: Optional[str] = None
+    certifications: Optional[List[str]] = None
+    employment_status: Optional[str] = None
+    onboarding_complete: Optional[bool] = None
+
+
+class AdminCreateSiteIn(BaseModel):
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+    supervisor: str
+    supervisor_phone: str
+    instructions: str = ""
+    geofence_radius_m: int = 150
+
+
+class AdminUpdateSiteIn(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    supervisor: Optional[str] = None
+    supervisor_phone: Optional[str] = None
+    instructions: Optional[str] = None
+    geofence_radius_m: Optional[int] = None
+
+
+class AdminCreateShiftIn(BaseModel):
+    user_id: str
+    site_id: str
+    start: str
+    end: str
+    role: str = "Patrol"
+    pay_rate: float = 24.50
+
+
+class AdminUpdateShiftIn(BaseModel):
+    user_id: Optional[str] = None
+    site_id: Optional[str] = None
+    start: Optional[str] = None
+    end: Optional[str] = None
+    role: Optional[str] = None
+    pay_rate: Optional[float] = None
+    status: Optional[str] = None
+    hours_worked: Optional[float] = None
+
+
+class AdminCreateOpenShiftIn(BaseModel):
+    site_id: str
+    start: str
+    end: str
+    role: str = "Patrol"
+    pay_rate: float = 24.50
+    spots_available: int = 1
+    urgent: bool = False
+
+
+class AdminCreateAnnouncementIn(BaseModel):
+    title: str
+    body: str
+    severity: str = "info"
+    site_id: Optional[str] = None
+    posted_by: Optional[str] = None
+
+
+class AdminUpdateIncidentIn(BaseModel):
+    status: str
+    notes: Optional[str] = None
+
+
+class AdminCreatePayrollIn(BaseModel):
+    user_id: str
+    period_start: str
+    period_end: str
+    pay_date: str
+    hours_regular: float
+    hours_overtime: float = 0.0
+    pay_rate: float = 24.50
+
+
+class AdminUpdatePayrollIn(BaseModel):
+    status: Optional[str] = None
+    hours_regular: Optional[float] = None
+    hours_overtime: Optional[float] = None
+    pay_date: Optional[str] = None
+    gross: Optional[float] = None
+    net: Optional[float] = None
+
+
+class AdminUpdateTimeclockIn(BaseModel):
+    clock_in: Optional[str] = None
+    clock_out: Optional[str] = None
+    hours_worked: Optional[float] = None
+
+
+# ============================================================
+# ADMIN ROUTES — Dashboard
+# ============================================================
+
+@api.get("/admin/dashboard")
+async def admin_dashboard(admin=Depends(require_admin)):
+    now = now_utc()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    total_guards = await db.users.count_documents({"role": "employee"})
+    shifts_today = await db.shifts.count_documents({"start": {"$gte": iso(today_start), "$lt": iso(today_end)}})
+    active_clocked = await db.timeclock.count_documents({"clock_out": None})
+    open_incidents = await db.incidents.count_documents({"status": "submitted"})
+    pending_payroll = await db.payroll.count_documents({"status": {"$in": ["submitted", "under_review"]}})
+    recent_incidents = await db.incidents.find(
+        {}, {"_id": 0, "photos": 0, "signature_base64": 0}
+    ).sort("created_at", -1).to_list(5)
+    active_entries = await db.timeclock.find({"clock_out": None}, {"_id": 0, "selfie_in": 0}).to_list(20)
+    if active_entries:
+        uids = [e["user_id"] for e in active_entries]
+        sids = [e["site_id"] for e in active_entries if e.get("site_id")]
+        um = {u["id"]: u for u in await db.users.find({"id": {"$in": uids}}, {"_id": 0, "hashed_password": 0}).to_list(20)}
+        sm = {s["id"]: s for s in await db.sites.find({"id": {"$in": sids}}, {"_id": 0}).to_list(20)} if sids else {}
+        for e in active_entries:
+            e["user"] = um.get(e["user_id"])
+            e["site"] = sm.get(e.get("site_id"))
+    return {
+        "total_guards": total_guards, "shifts_today": shifts_today,
+        "active_clocked": active_clocked, "open_incidents": open_incidents,
+        "pending_payroll": pending_payroll, "recent_incidents": recent_incidents,
+        "active_entries": active_entries,
+    }
+
+
+# ============================================================
+# ADMIN ROUTES — Guards
+# ============================================================
+
+@api.get("/admin/guards")
+async def admin_list_guards(admin=Depends(require_admin)):
+    guards = await db.users.find({}, {"_id": 0, "hashed_password": 0}).sort("full_name", 1).to_list(500)
+    return {"guards": guards}
+
+
+@api.post("/admin/guards", status_code=201)
+async def admin_create_guard(body: AdminCreateGuardIn, admin=Depends(require_admin)):
+    if await db.users.find_one({"email": body.email.lower()}):
+        raise HTTPException(400, "Email already registered")
+    user_id = str(uuid.uuid4())
+    guard = {
+        "id": user_id, "email": body.email.lower(),
+        "hashed_password": hash_password(body.password),
+        "full_name": body.full_name, "phone": body.phone, "role": "employee",
+        "employee_number": body.employee_number or f"SH-{str(uuid.uuid4())[:4].upper()}",
+        "licence_number": body.licence_number, "licence_expiry": body.licence_expiry,
+        "certifications": body.certifications, "employment_status": body.employment_status,
+        "photo_url": None, "emergency_contact": None, "onboarding_complete": False,
+        "created_at": iso(now_utc()),
+    }
+    await db.users.insert_one(guard)
+    guard.pop("hashed_password", None); guard.pop("_id", None)
+    return guard
+
+
+@api.get("/admin/guards/{guard_id}")
+async def admin_get_guard(guard_id: str, admin=Depends(require_admin)):
+    guard = await db.users.find_one({"id": guard_id}, {"_id": 0, "hashed_password": 0})
+    if not guard:
+        raise HTTPException(404, "Guard not found")
+    recent_shifts = await db.shifts.find({"user_id": guard_id}, {"_id": 0}).sort("start", -1).to_list(10)
+    for s in recent_shifts:
+        s["site"] = await db.sites.find_one({"id": s["site_id"]}, {"_id": 0})
+    recent_clock = await db.timeclock.find(
+        {"user_id": guard_id}, {"_id": 0, "selfie_in": 0, "selfie_out": 0}
+    ).sort("clock_in", -1).to_list(10)
+    equipment = await db.equipment.find({"user_id": guard_id}, {"_id": 0}).to_list(20)
+    return {"guard": guard, "recent_shifts": recent_shifts, "recent_clock": recent_clock, "equipment": equipment}
+
+
+@api.put("/admin/guards/{guard_id}")
+async def admin_update_guard(guard_id: str, body: AdminUpdateGuardIn, admin=Depends(require_admin)):
+    update = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    r = await db.users.update_one({"id": guard_id}, {"$set": update})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Guard not found")
+    return await db.users.find_one({"id": guard_id}, {"_id": 0, "hashed_password": 0})
+
+
+# ============================================================
+# ADMIN ROUTES — Sites
+# ============================================================
+
+@api.get("/admin/sites")
+async def admin_list_sites(admin=Depends(require_admin)):
+    sites = await db.sites.find({}, {"_id": 0}).sort("name", 1).to_list(200)
+    return {"sites": sites}
+
+
+@api.post("/admin/sites", status_code=201)
+async def admin_create_site(body: AdminCreateSiteIn, admin=Depends(require_admin)):
+    site = {"id": str(uuid.uuid4()), **body.model_dump()}
+    await db.sites.insert_one(site)
+    site.pop("_id", None)
+    return site
+
+
+@api.put("/admin/sites/{site_id}")
+async def admin_update_site(site_id: str, body: AdminUpdateSiteIn, admin=Depends(require_admin)):
+    update = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    r = await db.sites.update_one({"id": site_id}, {"$set": update})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Site not found")
+    return await db.sites.find_one({"id": site_id}, {"_id": 0})
+
+
+@api.delete("/admin/sites/{site_id}", status_code=204)
+async def admin_delete_site(site_id: str, admin=Depends(require_admin)):
+    r = await db.sites.delete_one({"id": site_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Site not found")
+
+
+# ============================================================
+# ADMIN ROUTES — Shifts
+# ============================================================
+
+@api.get("/admin/shifts")
+async def admin_list_shifts(
+    admin=Depends(require_admin),
+    user_id: Optional[str] = None,
+    site_id: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    shift_status: Optional[str] = Query(None, alias="status"),
+):
+    q: dict = {}
+    if user_id: q["user_id"] = user_id
+    if site_id: q["site_id"] = site_id
+    if shift_status: q["status"] = shift_status
+    if from_date or to_date:
+        q["start"] = {}
+        if from_date: q["start"]["$gte"] = from_date
+        if to_date: q["start"]["$lte"] = to_date
+    shifts = await db.shifts.find(q, {"_id": 0}).sort("start", -1).to_list(500)
+    if shifts:
+        sids = list({s["site_id"] for s in shifts})
+        uids = list({s["user_id"] for s in shifts})
+        sm = {s["id"]: s for s in await db.sites.find({"id": {"$in": sids}}, {"_id": 0}).to_list(200)}
+        um = {u["id"]: u for u in await db.users.find({"id": {"$in": uids}}, {"_id": 0, "hashed_password": 0}).to_list(500)}
+        for s in shifts:
+            s["site"] = sm.get(s["site_id"]); s["user"] = um.get(s["user_id"])
+    return {"shifts": shifts}
+
+
+@api.post("/admin/shifts", status_code=201)
+async def admin_create_shift(body: AdminCreateShiftIn, admin=Depends(require_admin)):
+    if not await db.users.find_one({"id": body.user_id}):
+        raise HTTPException(404, "Guard not found")
+    if not await db.sites.find_one({"id": body.site_id}):
+        raise HTTPException(404, "Site not found")
+    shift = {
+        "id": str(uuid.uuid4()), "user_id": body.user_id, "site_id": body.site_id,
+        "start": body.start, "end": body.end, "role": body.role, "pay_rate": body.pay_rate,
+        "status": "scheduled", "instructions_acknowledged": False,
+        "created_by": admin["id"], "created_at": iso(now_utc()),
+    }
+    await db.shifts.insert_one(shift); shift.pop("_id", None)
+    await send_push([body.user_id], {"title": "New Shift Assigned", "message": f"{body.role} shift on {body.start[:10]}"})
+    return shift
+
+
+@api.put("/admin/shifts/{shift_id}")
+async def admin_update_shift(shift_id: str, body: AdminUpdateShiftIn, admin=Depends(require_admin)):
+    update = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    r = await db.shifts.update_one({"id": shift_id}, {"$set": update})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Shift not found")
+    return await db.shifts.find_one({"id": shift_id}, {"_id": 0})
+
+
+@api.delete("/admin/shifts/{shift_id}", status_code=204)
+async def admin_delete_shift(shift_id: str, admin=Depends(require_admin)):
+    r = await db.shifts.delete_one({"id": shift_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Shift not found")
+
+
+# ============================================================
+# ADMIN ROUTES — Open Shifts
+# ============================================================
+
+@api.get("/admin/open-shifts")
+async def admin_list_open_shifts(admin=Depends(require_admin)):
+    shifts = await db.open_shifts.find({}, {"_id": 0}).sort("start", 1).to_list(200)
+    if shifts:
+        sids = list({s["site_id"] for s in shifts})
+        sm = {s["id"]: s for s in await db.sites.find({"id": {"$in": sids}}, {"_id": 0}).to_list(50)}
+        for s in shifts:
+            s["site"] = sm.get(s["site_id"]); s["claimed_count"] = len(s.get("claimed_by") or [])
+    return {"shifts": shifts}
+
+
+@api.post("/admin/open-shifts", status_code=201)
+async def admin_create_open_shift(body: AdminCreateOpenShiftIn, admin=Depends(require_admin)):
+    if not await db.sites.find_one({"id": body.site_id}):
+        raise HTTPException(404, "Site not found")
+    shift = {"id": str(uuid.uuid4()), **body.model_dump(), "posted_at": iso(now_utc()), "claimed_by": [], "waitlist": [], "posted_by": admin["id"]}
+    await db.open_shifts.insert_one(shift); shift.pop("_id", None)
+    return shift
+
+
+@api.delete("/admin/open-shifts/{shift_id}", status_code=204)
+async def admin_delete_open_shift(shift_id: str, admin=Depends(require_admin)):
+    r = await db.open_shifts.delete_one({"id": shift_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Open shift not found")
+
+
+# ============================================================
+# ADMIN ROUTES — Announcements
+# ============================================================
+
+@api.get("/admin/announcements")
+async def admin_list_announcements(admin=Depends(require_admin)):
+    items = await db.announcements.find({}, {"_id": 0}).sort("posted_at", -1).to_list(200)
+    total_guards = await db.users.count_documents({"role": "employee"})
+    for a in items:
+        a["read_count"] = len(a.get("read_by") or []); a["total_guards"] = total_guards
+    return {"announcements": items}
+
+
+@api.post("/admin/announcements", status_code=201)
+async def admin_create_announcement(body: AdminCreateAnnouncementIn, admin=Depends(require_admin)):
+    ann = {
+        "id": str(uuid.uuid4()), "title": body.title, "body": body.body,
+        "severity": body.severity, "site_id": body.site_id,
+        "posted_by": body.posted_by or admin.get("full_name", "Admin"),
+        "posted_at": iso(now_utc()), "read_by": [],
+    }
+    await db.announcements.insert_one(ann); ann.pop("_id", None)
+    guards = await db.users.find({"role": "employee"}, {"id": 1}).to_list(500)
+    await send_push([g["id"] for g in guards], {"title": body.title, "message": body.body[:120]})
+    return ann
+
+
+@api.delete("/admin/announcements/{ann_id}", status_code=204)
+async def admin_delete_announcement(ann_id: str, admin=Depends(require_admin)):
+    r = await db.announcements.delete_one({"id": ann_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Announcement not found")
+
+
+# ============================================================
+# ADMIN ROUTES — Incidents
+# ============================================================
+
+@api.get("/admin/incidents")
+async def admin_list_incidents(
+    admin=Depends(require_admin),
+    inc_status: Optional[str] = Query(None, alias="status"),
+):
+    q: dict = {}
+    if inc_status: q["status"] = inc_status
+    items = await db.incidents.find(q, {"_id": 0, "photos": 0, "signature_base64": 0}).sort("created_at", -1).to_list(200)
+    if items:
+        sids = list({i["site_id"] for i in items if i.get("site_id")})
+        if sids:
+            sm = {s["id"]: s for s in await db.sites.find({"id": {"$in": sids}}, {"_id": 0}).to_list(50)}
+            for inc in items:
+                inc["site"] = sm.get(inc.get("site_id"))
+    return {"incidents": items}
+
+
+@api.put("/admin/incidents/{inc_id}")
+async def admin_update_incident(inc_id: str, body: AdminUpdateIncidentIn, admin=Depends(require_admin)):
+    update: dict = {"status": body.status, "reviewed_by": admin["id"], "reviewed_at": iso(now_utc())}
+    if body.notes: update["review_notes"] = body.notes
+    r = await db.incidents.update_one({"id": inc_id}, {"$set": update})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Incident not found")
+    return await db.incidents.find_one({"id": inc_id}, {"_id": 0, "photos": 0, "signature_base64": 0})
+
+
+# ============================================================
+# ADMIN ROUTES — Payroll
+# ============================================================
+
+@api.get("/admin/payroll")
+async def admin_list_payroll(
+    admin=Depends(require_admin),
+    user_id: Optional[str] = None,
+    payroll_status: Optional[str] = Query(None, alias="status"),
+):
+    q: dict = {}
+    if user_id: q["user_id"] = user_id
+    if payroll_status: q["status"] = payroll_status
+    periods = await db.payroll.find(q, {"_id": 0}).sort("period_end", -1).to_list(500)
+    if periods:
+        uids = list({p["user_id"] for p in periods})
+        um = {u["id"]: u for u in await db.users.find({"id": {"$in": uids}}, {"_id": 0, "hashed_password": 0}).to_list(500)}
+        for p in periods: p["user"] = um.get(p["user_id"])
+    return {"periods": periods}
+
+
+@api.post("/admin/payroll", status_code=201)
+async def admin_create_payroll(body: AdminCreatePayrollIn, admin=Depends(require_admin)):
+    gross = round(body.hours_regular * body.pay_rate + body.hours_overtime * body.pay_rate * 1.5, 2)
+    net = round(gross * 0.72, 2)
+    record = {
+        "id": str(uuid.uuid4()), "user_id": body.user_id,
+        "period_start": body.period_start, "period_end": body.period_end,
+        "pay_date": body.pay_date, "hours_regular": body.hours_regular,
+        "hours_overtime": body.hours_overtime, "gross": gross, "net": net,
+        "status": "submitted", "pay_stub_url": None,
+        "created_by": admin["id"], "created_at": iso(now_utc()),
+    }
+    await db.payroll.insert_one(record); record.pop("_id", None)
+    return record
+
+
+@api.put("/admin/payroll/{payroll_id}")
+async def admin_update_payroll(payroll_id: str, body: AdminUpdatePayrollIn, admin=Depends(require_admin)):
+    update = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    r = await db.payroll.update_one({"id": payroll_id}, {"$set": update})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Payroll record not found")
+    updated = await db.payroll.find_one({"id": payroll_id}, {"_id": 0})
+    if updated and updated.get("status") == "released":
+        await send_push([updated["user_id"]], {"title": "Payroll Released", "message": f"Pay for {updated.get('period_end','')[:10]} has been released."})
+    return updated
+
+
+# ============================================================
+# ADMIN ROUTES — Timeclock
+# ============================================================
+
+@api.get("/admin/timeclock")
+async def admin_list_timeclock(
+    admin=Depends(require_admin),
+    user_id: Optional[str] = None,
+    active_only: bool = False,
+):
+    q: dict = {}
+    if user_id: q["user_id"] = user_id
+    if active_only: q["clock_out"] = None
+    entries = await db.timeclock.find(q, {"_id": 0, "selfie_in": 0, "selfie_out": 0}).sort("clock_in", -1).to_list(200)
+    if entries:
+        uids = list({e["user_id"] for e in entries})
+        sids = list({e["site_id"] for e in entries if e.get("site_id")})
+        um = {u["id"]: u for u in await db.users.find({"id": {"$in": uids}}, {"_id": 0, "hashed_password": 0}).to_list(200)}
+        sm = {s["id"]: s for s in await db.sites.find({"id": {"$in": sids}}, {"_id": 0}).to_list(50)} if sids else {}
+        for e in entries:
+            e["user"] = um.get(e["user_id"]); e["site"] = sm.get(e.get("site_id"))
+    return {"entries": entries}
+
+
+@api.put("/admin/timeclock/{entry_id}")
+async def admin_update_timeclock(entry_id: str, body: AdminUpdateTimeclockIn, admin=Depends(require_admin)):
+    update = {k: v for k, v in body.model_dump().items() if v is not None}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    update.update({"manually_adjusted": True, "adjusted_by": admin["id"], "adjusted_at": iso(now_utc())})
+    r = await db.timeclock.update_one({"id": entry_id}, {"$set": update})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Timeclock entry not found")
+    return await db.timeclock.find_one({"id": entry_id}, {"_id": 0, "selfie_in": 0, "selfie_out": 0})
+
+
 app.include_router(api)
 
 app.add_middleware(

@@ -69,7 +69,8 @@ export default function Login() {
             </Pressable>
           </View>
 
-          <Text style={styles.demoText}>Demo: guard@skyhawk.com · Password123</Text>
+          <Text style={styles.demoText}>Guard: guard@skyhawk.com · Password123</Text>
+          <Text style={styles.demoText}>Manager: admin@skyhawk.com · Admin123</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
