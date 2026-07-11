@@ -55,13 +55,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const login = async (email: string, password: string) => {
+    console.log('[DEBUG] login: calling api...');
     const r = await api<{ access_token: string; user: User }>('/auth/login', {
       method: 'POST',
       body: { email, password },
       auth: false,
     });
+    console.log('[DEBUG] login: api returned', JSON.stringify(r).slice(0, 80));
     await setToken(r.access_token);
+    console.log('[DEBUG] login: token set, calling setUser');
     setUser(r.user);
+    console.log('[DEBUG] login: setUser called, returning');
   };
 
   const register = async (email: string, password: string, full_name: string, phone?: string) => {
