@@ -3,9 +3,20 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { theme } from "@/src/theme";
 import { StatusPill } from "@/src/ui";
 import { api } from "@/src/api/client";
+
+// ─── Light palette (matches Profile / Schedule) ─────────────────────────────
+const C = {
+  bg: "#F2F2F7",
+  card: "#FFFFFF",
+  border: "#E5E5EA",
+  divider: "#E5E5EA",
+  text: "#0B0B0C",
+  textSecondary: "#6C6C70",
+  textTertiary: "#AEAEB2",
+  accent: "#0A84FF",
+};
 
 function fmt(iso?: string) {
   if (!iso) return "—";
@@ -26,7 +37,7 @@ export default function Employment() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={C.textSecondary} style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
   }
@@ -46,7 +57,7 @@ export default function Employment() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }}>
-          <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
+          <Ionicons name="chevron-back" size={26} color={C.text} />
         </Pressable>
         <Text style={styles.title}>Employment</Text>
       </View>
@@ -70,9 +81,9 @@ export default function Employment() {
         </View>
 
         <Pressable testID="go-onboarding-from-employment" onPress={() => router.push("/onboarding")} style={styles.linkRow}>
-          <Ionicons name="school-outline" size={19} color={theme.colors.text} style={{ marginRight: 14 }} />
+          <Ionicons name="school-outline" size={19} color={C.text} style={{ marginRight: 14 }} />
           <Text style={styles.linkLabel}>View onboarding progress</Text>
-          <Ionicons name="chevron-forward" size={14} color={theme.colors.textTertiary} />
+          <Ionicons name="chevron-forward" size={14} color={C.textTertiary} />
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -80,24 +91,25 @@ export default function Employment() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  safe: { flex: 1, backgroundColor: C.bg },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
-  title: { color: theme.colors.text, fontSize: 20, fontWeight: "600" },
+  title: { color: C.text, fontSize: 20, fontWeight: "600" },
 
   statusCard: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: theme.colors.card, borderRadius: theme.radius.lg,
+    backgroundColor: C.card, borderRadius: 14,
     paddingHorizontal: 16, paddingVertical: 16, marginTop: 12, marginBottom: 16,
+    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1,
   },
-  statusLabel: { color: theme.colors.textSecondary, fontSize: 12, marginBottom: 4 },
-  statusValue: { color: theme.colors.text, fontSize: 17, fontWeight: "600" },
+  statusLabel: { color: C.textSecondary, fontSize: 12, marginBottom: 4 },
+  statusValue: { color: C.text, fontSize: 17, fontWeight: "600" },
 
-  card: { backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, paddingHorizontal: 16, marginBottom: 20 },
+  card: { backgroundColor: C.card, borderRadius: 14, paddingHorizontal: 16, marginBottom: 20, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 14 },
-  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
-  rowLabel: { color: theme.colors.textSecondary, fontSize: 14 },
-  rowValue: { color: theme.colors.text, fontSize: 14, fontWeight: "500" },
+  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.divider },
+  rowLabel: { color: C.textSecondary, fontSize: 14 },
+  rowValue: { color: C.text, fontSize: 14, fontWeight: "500" },
 
-  linkRow: { flexDirection: "row", alignItems: "center", backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, paddingHorizontal: 16, paddingVertical: 14 },
-  linkLabel: { flex: 1, color: theme.colors.text, fontSize: 15 },
+  linkRow: { flexDirection: "row", alignItems: "center", backgroundColor: C.card, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+  linkLabel: { flex: 1, color: C.text, fontSize: 15 },
 });

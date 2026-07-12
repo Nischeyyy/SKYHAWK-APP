@@ -3,18 +3,30 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Switch } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { theme } from "@/src/theme";
 import { useAuth } from "@/src/auth/AuthContext";
+
+// ─── Light palette (matches Profile / Schedule) ─────────────────────────────
+const C = {
+  bg: "#F2F2F7",
+  card: "#FFFFFF",
+  border: "#E5E5EA",
+  divider: "#E5E5EA",
+  text: "#0B0B0C",
+  textSecondary: "#6C6C70",
+  textTertiary: "#AEAEB2",
+  accent: "#0A84FF",
+  red: "#E13B3B",
+};
 
 function ToggleRow({ icon, label, value, onChange, last }: { icon: any; label: string; value: boolean; onChange: (v: boolean) => void; last?: boolean }) {
   return (
     <View style={[styles.row, !last && styles.rowBorder]}>
-      <Ionicons name={icon} size={19} color={theme.colors.text} style={{ marginRight: 14 }} />
+      <Ionicons name={icon} size={19} color={C.text} style={{ marginRight: 14 }} />
       <Text style={styles.rowLabel}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onChange}
-        trackColor={{ false: theme.colors.border, true: theme.colors.accent }}
+        trackColor={{ false: C.border, true: C.accent }}
         thumbColor="#FFFFFF"
       />
     </View>
@@ -24,9 +36,9 @@ function ToggleRow({ icon, label, value, onChange, last }: { icon: any; label: s
 function NavRow({ icon, label, onPress, last, danger, testID }: any) {
   return (
     <Pressable testID={testID} onPress={onPress} style={[styles.row, !last && styles.rowBorder]}>
-      <Ionicons name={icon} size={19} color={danger ? theme.colors.danger : theme.colors.text} style={{ marginRight: 14 }} />
-      <Text style={[styles.rowLabel, danger && { color: theme.colors.danger }]}>{label}</Text>
-      {!danger && <Ionicons name="chevron-forward" size={14} color={theme.colors.textTertiary} />}
+      <Ionicons name={icon} size={19} color={danger ? C.red : C.text} style={{ marginRight: 14 }} />
+      <Text style={[styles.rowLabel, danger && { color: C.red }]}>{label}</Text>
+      {!danger && <Ionicons name="chevron-forward" size={14} color={C.textTertiary} />}
     </Pressable>
   );
 }
@@ -41,7 +53,7 @@ export default function Settings() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }}>
-          <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
+          <Ionicons name="chevron-back" size={26} color={C.text} />
         </Pressable>
         <Text style={styles.title}>Settings</Text>
       </View>
@@ -62,12 +74,12 @@ export default function Settings() {
         <Text style={styles.sectionLabel}>About</Text>
         <View style={styles.card}>
           <View style={[styles.row, styles.rowBorder]}>
-            <Ionicons name="information-circle-outline" size={19} color={theme.colors.text} style={{ marginRight: 14 }} />
+            <Ionicons name="information-circle-outline" size={19} color={C.text} style={{ marginRight: 14 }} />
             <Text style={styles.rowLabel}>Version</Text>
             <Text style={styles.rowValue}>1.0.0</Text>
           </View>
           <View style={[styles.row]}>
-            <Ionicons name="mail-outline" size={19} color={theme.colors.text} style={{ marginRight: 14 }} />
+            <Ionicons name="mail-outline" size={19} color={C.text} style={{ marginRight: 14 }} />
             <Text style={styles.rowLabel}>Signed in as</Text>
             <Text style={styles.rowValue} numberOfLines={1}>{user?.email || "—"}</Text>
           </View>
@@ -82,15 +94,15 @@ export default function Settings() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  safe: { flex: 1, backgroundColor: C.bg },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
-  title: { color: theme.colors.text, fontSize: 20, fontWeight: "600" },
+  title: { color: C.text, fontSize: 20, fontWeight: "600" },
 
-  sectionLabel: { color: theme.colors.textSecondary, fontSize: 13, fontWeight: "500", marginTop: 20, marginBottom: 8 },
+  sectionLabel: { color: C.textSecondary, fontSize: 13, fontWeight: "500", marginTop: 20, marginBottom: 8 },
 
-  card: { backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, paddingHorizontal: 16, marginBottom: 8 },
+  card: { backgroundColor: C.card, borderRadius: 14, paddingHorizontal: 16, marginBottom: 8, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
   row: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
-  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
-  rowLabel: { flex: 1, color: theme.colors.text, fontSize: 15 },
-  rowValue: { color: theme.colors.textSecondary, fontSize: 13, maxWidth: 180 },
+  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.divider },
+  rowLabel: { flex: 1, color: C.text, fontSize: 15 },
+  rowValue: { color: C.textSecondary, fontSize: 13, maxWidth: 180 },
 });
