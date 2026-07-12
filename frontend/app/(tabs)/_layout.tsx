@@ -20,9 +20,9 @@ export default function TabsLayout() {
         title: "Shifts",
         tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "list" : "list-outline"} size={22} color={color} />,
       }} />
-      <Tabs.Screen name="wallet" options={{
-        title: "Wallet",
-        tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "card" : "card-outline"} size={22} color={color} />,
+      <Tabs.Screen name="community" options={{
+        title: "Community",
+        tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "people" : "people-outline"} size={22} color={color} />,
       }} />
       <Tabs.Screen name="profile" options={{
         title: "Profile",

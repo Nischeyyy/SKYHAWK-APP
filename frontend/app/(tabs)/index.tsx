@@ -287,13 +287,13 @@ export default function Dashboard() {
           <View style={styles.block}>
             <View style={styles.blockHeader}>
               <Text style={styles.sectionLabel}>CREDENTIALS</Text>
-              <Pressable testID="view-credentials-link" onPress={() => { tap(); router.push("/(tabs)/wallet"); }} style={styles.rowLink}>
+              <Pressable testID="view-credentials-link" onPress={() => { tap(); router.push("/wallet"); }} style={styles.rowLink}>
                 <Text style={styles.linkText}>View All</Text>
                 <Ionicons name="chevron-forward" size={14} color={light.textSecondary} />
               </Pressable>
             </View>
             {credential ? (
-              <Pressable testID="credential-card" onPress={() => { tap(); router.push("/(tabs)/wallet"); }} style={styles.listCard}>
+              <Pressable testID="credential-card" onPress={() => { tap(); router.push("/wallet"); }} style={styles.listCard}>
                 <View style={styles.credRow}>
                   <View style={styles.credIconWrap}>
                     <Ionicons name="shield-checkmark-outline" size={20} color={light.text} />

@@ -283,6 +283,17 @@ class WalletDocIn(BaseModel):
     expiry: str = Field(max_length=50)
 
 
+class CommunityPostIn(BaseModel):
+    body: str = Field(min_length=1, max_length=4000)
+    type: str = Field(default="post", max_length=20)  # post | announcement | event | recognition
+    audience: str = Field(default="All Staff", max_length=50)
+    attachments: List[dict] = Field(default_factory=list)
+
+
+class CommunityCommentIn(BaseModel):
+    body: str = Field(min_length=1, max_length=1000)
+
+
 # ============================================================
 # App
 # ============================================================
@@ -354,6 +365,8 @@ async def ensure_indexes():
     await db.shift_swaps.create_index("id", unique=True)
     await db.shift_swaps.create_index([("status", 1), ("start", 1)])
     await db.location_pings.create_index([("timeclock_id", 1), ("ts", -1)])
+    await db.community_posts.create_index("id", unique=True)
+    await db.community_posts.create_index([("type", 1), ("created_at", -1)])
 
 
 # ============================================================
@@ -609,6 +622,48 @@ async def seed_data():
         {"id": str(uuid.uuid4()), "user_id": guard_id, "type": "keys",
          "description": "Master keyring #K-88 (Bay St)", "issued_at": iso(now_utc() - timedelta(days=60)), "status": "issued"},
     ])
+
+    # Community feed
+    t_now = now_utc()
+    community_posts = [
+        {
+            "id": str(uuid.uuid4()),
+            "author_id": None, "author_name": "Samantha Lee", "author_handle": "samanthalee",
+            "author_photo": "https://images.unsplash.com/photo-1580489944761-15a19d654956",
+            "audience": "All Staff", "type": "announcement",
+            "title": "New Parking Instructions – Downtown Sites",
+            "body": "Starting Monday, please use the west entrance for all downtown sites. See the attached map for details.",
+            "attachments": [{"name": "Downtown Parking Map.pdf", "kind": "pdf", "size_label": "1.2 MB"}],
+            "created_at": iso(t_now - timedelta(hours=2)),
+            "likes": [], "comments": [], "seen_by": [admin_id, guard2_id],
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "author_id": None, "author_name": "Jamal Carter", "author_handle": "jamal.carter",
+            "author_photo": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
+            "audience": "All Staff", "type": "recognition",
+            "title": None,
+            "body": "Huge shoutout to the team at Harbourfront last night. Great work keeping the event safe and running smoothly!",
+            "attachments": [],
+            "created_at": iso(t_now - timedelta(hours=5)),
+            "likes": [guard_id, admin_id], "comments": [
+                {"id": str(uuid.uuid4()), "user_id": guard_id, "user_name": "Marcus Vance",
+                 "body": "Team effort all around!", "created_at": iso(t_now - timedelta(hours=4))},
+            ], "seen_by": [admin_id, guard_id, guard2_id],
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "author_id": None, "author_name": "Elena Rodriguez", "author_handle": "elena.rodriguez",
+            "author_photo": "https://images.unsplash.com/photo-1544005313-94ddf0286df2",
+            "audience": "All Staff", "type": "event",
+            "title": "Quarterly Safety Training",
+            "body": "Mandatory refresher training on de-escalation and emergency response — Saturday 10am at the Bay Street office. Please confirm attendance with your supervisor.",
+            "attachments": [],
+            "created_at": iso(t_now - timedelta(days=1)),
+            "likes": [], "comments": [], "seen_by": [admin_id],
+        },
+    ]
+    await db.community_posts.insert_many(community_posts)
 
     logger.info("Seed complete.")
 
@@ -2187,6 +2242,101 @@ async def update_wallet_doc(doc_id: str, body: WalletDocIn, user=Depends(get_cur
     update = {"name": body.name, "number": body.number, "expiry": body.expiry, "type": body.type, "status": _compliance_status(body.expiry), "updated_at": iso(now_utc())}
     await db.wallet_documents.update_one({"id": doc_id}, {"$set": update})
     return await db.wallet_documents.find_one({"id": doc_id}, {"_id": 0})
+
+
+# ============================================================
+# COMMUNITY
+# ============================================================
+def _serialize_post(p: dict, user_id: str) -> dict:
+    likes = p.get("likes") or []
+    return {
+        "id": p["id"],
+        "author_id": p.get("author_id"),
+        "author_name": p.get("author_name"),
+        "author_handle": p.get("author_handle"),
+        "author_photo": p.get("author_photo"),
+        "audience": p.get("audience", "All Staff"),
+        "type": p.get("type", "post"),
+        "title": p.get("title"),
+        "body": p.get("body", ""),
+        "attachments": p.get("attachments") or [],
+        "created_at": p.get("created_at"),
+        "like_count": len(likes),
+        "liked_by_me": user_id in likes,
+        "comments": p.get("comments") or [],
+        "comment_count": len(p.get("comments") or []),
+        "seen_count": len(p.get("seen_by") or []),
+    }
+
+
+@api.get("/community/posts")
+async def list_community_posts(type: Optional[str] = Query(default=None), user=Depends(get_current_user)):
+    query = {}
+    if type and type != "all":
+        query["type"] = type
+    items = await db.community_posts.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+    if items:
+        await db.community_posts.update_many(
+            {"id": {"$in": [p["id"] for p in items]}},
+            {"$addToSet": {"seen_by": user["id"]}},
+        )
+    return {"posts": [_serialize_post(p, user["id"]) for p in items]}
+
+
+@api.post("/community/posts", status_code=201)
+async def create_community_post(body: CommunityPostIn, user=Depends(get_current_user)):
+    if body.type not in ("post", "announcement", "event", "recognition"):
+        raise HTTPException(400, "Invalid post type")
+    post = {
+        "id": str(uuid.uuid4()),
+        "author_id": user["id"],
+        "author_name": user["full_name"],
+        "author_handle": (user["full_name"] or "").lower().replace(" ", ""),
+        "author_photo": user.get("photo_url"),
+        "audience": body.audience,
+        "type": body.type,
+        "title": None,
+        "body": body.body,
+        "attachments": body.attachments,
+        "created_at": iso(now_utc()),
+        "likes": [],
+        "comments": [],
+        "seen_by": [user["id"]],
+    }
+    await db.community_posts.insert_one(post)
+    return _serialize_post(post, user["id"])
+
+
+@api.post("/community/posts/{post_id}/like")
+async def toggle_like_community_post(post_id: str, user=Depends(get_current_user)):
+    post = await db.community_posts.find_one({"id": post_id}, {"_id": 0})
+    if not post:
+        raise HTTPException(404, "Post not found")
+    likes = post.get("likes") or []
+    if user["id"] in likes:
+        await db.community_posts.update_one({"id": post_id}, {"$pull": {"likes": user["id"]}})
+        liked = False
+    else:
+        await db.community_posts.update_one({"id": post_id}, {"$addToSet": {"likes": user["id"]}})
+        liked = True
+    post = await db.community_posts.find_one({"id": post_id}, {"_id": 0})
+    return _serialize_post(post, user["id"])
+
+
+@api.post("/community/posts/{post_id}/comments", status_code=201)
+async def add_community_comment(post_id: str, body: CommunityCommentIn, user=Depends(get_current_user)):
+    comment = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "user_name": user["full_name"],
+        "body": body.body,
+        "created_at": iso(now_utc()),
+    }
+    r = await db.community_posts.update_one({"id": post_id}, {"$push": {"comments": comment}})
+    if r.matched_count == 0:
+        raise HTTPException(404, "Post not found")
+    post = await db.community_posts.find_one({"id": post_id}, {"_id": 0})
+    return _serialize_post(post, user["id"])
 
 
 app.include_router(api)

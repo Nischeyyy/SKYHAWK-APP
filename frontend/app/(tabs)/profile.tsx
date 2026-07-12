@@ -194,6 +194,7 @@ export default function Profile() {
         <View style={s.card}>
           <NavRow icon="school-outline"  label="Onboarding"       onPress={() => router.push("/onboarding")} testID="go-onboarding" />
           <NavRow icon="cash-outline"    label="Payroll"           onPress={() => router.push("/payroll")}    testID="go-payroll"    />
+          <NavRow icon="card-outline"    label="Wallet"            onPress={() => router.push("/wallet")}     testID="go-wallet"     />
           <NavRow icon="warning-outline" label="Incident Reports"  onPress={() => router.push("/incidents")}  testID="go-incidents"  last />
         </View>
 

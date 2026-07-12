@@ -1,13 +1,28 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { theme } from "@/src/theme";
 import { api } from "@/src/api/client";
 import { formatDate } from "@/src/utils/format";
 
+// ─── Light palette (matches Profile / Schedule) ─────────────────────────────
+const C = {
+  bg: "#F2F2F7",
+  card: "#FFFFFF",
+  border: "#E5E5EA",
+  divider: "#E5E5EA",
+  text: "#0B0B0C",
+  textSecondary: "#6C6C70",
+  textTertiary: "#AEAEB2",
+  accent: "#0A84FF",
+  danger: "#E13B3B",
+  warning: "#C77700",
+  verified: "#2FAE59",
+};
+
 export default function Wallet() {
+  const router = useRouter();
   const [data, setData] = useState<any>(null);
   const [compliance, setCompliance] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -31,17 +46,19 @@ export default function Wallet() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} />
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <Header router={router} />
+        <ActivityIndicator color={C.textSecondary} style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
   }
 
   if (error || !data) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <Header router={router} />
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <Text style={{ color: theme.colors.textSecondary, fontSize: 15, textAlign: "center" }}>
+          <Text style={{ color: C.textSecondary, fontSize: 15, textAlign: "center" }}>
             Couldn't load your wallet. Pull to refresh.
           </Text>
         </View>
@@ -58,11 +75,9 @@ export default function Wallet() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Wallet</Text>
-      </View>
+      <Header router={router} />
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 140 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Compliance alert banner */}
@@ -76,13 +91,13 @@ export default function Wallet() {
             <Ionicons
               name={overallStatus === "expired" ? "alert-circle" : "warning-outline"}
               size={20}
-              color={overallStatus === "expired" ? theme.colors.danger : theme.colors.warning}
+              color={overallStatus === "expired" ? C.danger : C.warning}
             />
             <View style={{ flex: 1 }}>
               <Text
                 style={[
                   styles.bannerTitle,
-                  { color: overallStatus === "expired" ? theme.colors.danger : theme.colors.warning },
+                  { color: overallStatus === "expired" ? C.danger : C.warning },
                 ]}
               >
                 {overallStatus === "expired" ? "Credential Expired" : "Credential Expiring Soon"}
@@ -125,14 +140,14 @@ export default function Wallet() {
             const cs: string = doc.compliance_status ?? doc.status ?? "valid";
             const daysLeft: number | null = doc.days_until_expiry ?? null;
             const dotColor =
-              cs === "expired" ? theme.colors.danger
-              : cs === "expiring_soon" ? theme.colors.warning
-              : cs === "expiring" ? theme.colors.warning
-              : theme.colors.verified;
+              cs === "expired" ? C.danger
+              : cs === "expiring_soon" ? C.warning
+              : cs === "expiring" ? C.warning
+              : C.verified;
             const expiryColor =
-              cs === "expired" ? theme.colors.danger
-              : cs === "expiring_soon" ? theme.colors.warning
-              : theme.colors.textSecondary;
+              cs === "expired" ? C.danger
+              : cs === "expiring_soon" ? C.warning
+              : C.textSecondary;
             return (
               <View
                 key={doc.id}
@@ -156,13 +171,24 @@ export default function Wallet() {
             );
           })}
           {docs.length === 0 && (
-            <Text style={{ color: theme.colors.textSecondary, fontSize: 14, padding: 16, textAlign: "center" }}>
+            <Text style={{ color: C.textSecondary, fontSize: 14, padding: 16, textAlign: "center" }}>
               No credentials on file
             </Text>
           )}
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function Header({ router }: { router: ReturnType<typeof useRouter> }) {
+  return (
+    <View style={styles.header}>
+      <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }}>
+        <Ionicons name="chevron-back" size={26} color={C.text} />
+      </Pressable>
+      <Text style={styles.title}>Wallet</Text>
+    </View>
   );
 }
 
@@ -198,49 +224,49 @@ function MockQR({ value }: { value: string }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
-  header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20 },
-  title: { color: theme.colors.text, fontSize: 32, fontWeight: "700", letterSpacing: -0.5 },
+  safe: { flex: 1, backgroundColor: C.bg },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 16 },
+  title: { color: C.text, fontSize: 20, fontWeight: "600" },
   complianceBanner: {
-    borderRadius: theme.radius.md, padding: 14,
+    borderRadius: 14, padding: 14,
     flexDirection: "row", alignItems: "flex-start", gap: 12,
     marginBottom: 20, borderWidth: 1,
   },
   bannerDanger: {
-    backgroundColor: "rgba(255,69,58,0.07)",
-    borderColor: "rgba(255,69,58,0.25)",
+    backgroundColor: "rgba(225,59,59,0.07)",
+    borderColor: "rgba(225,59,59,0.25)",
   },
   bannerWarning: {
-    backgroundColor: "rgba(255,159,10,0.07)",
-    borderColor: "rgba(255,159,10,0.25)",
+    backgroundColor: "rgba(199,119,0,0.07)",
+    borderColor: "rgba(199,119,0,0.25)",
   },
   bannerTitle: { fontSize: 14, fontWeight: "600" },
-  bannerSub: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 2, lineHeight: 18 },
-  idCard: { backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, padding: 22 },
+  bannerSub: { color: C.textSecondary, fontSize: 13, marginTop: 2, lineHeight: 18 },
+  idCard: { backgroundColor: C.card, borderRadius: 18, padding: 22, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
   idHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  idBrand: { color: theme.colors.text, fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
-  idBrandSub: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
-  idNumber: { color: theme.colors.textSecondary, fontSize: 13, fontFamily: "monospace" },
-  idName: { color: theme.colors.text, fontSize: 22, fontWeight: "600", marginTop: 20 },
-  idRole: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 3 },
+  idBrand: { color: C.text, fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
+  idBrandSub: { color: C.textSecondary, fontSize: 12, marginTop: 2 },
+  idNumber: { color: C.textSecondary, fontSize: 13, fontFamily: "monospace" },
+  idName: { color: C.text, fontSize: 22, fontWeight: "600", marginTop: 20 },
+  idRole: { color: C.textSecondary, fontSize: 14, marginTop: 3 },
   qrRow: {
     flexDirection: "row", alignItems: "center", marginTop: 24,
-    paddingTop: 20, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.colors.divider,
+    paddingTop: 20, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.divider,
   },
   qrBox: {},
-  qrLabel: { color: theme.colors.textSecondary, fontSize: 11, letterSpacing: 0.6, fontWeight: "600" },
-  qrHint: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 4 },
+  qrLabel: { color: C.textSecondary, fontSize: 11, letterSpacing: 0.6, fontWeight: "600" },
+  qrHint: { color: C.textSecondary, fontSize: 13, marginTop: 4 },
   groupLabel: {
-    color: theme.colors.textSecondary, fontSize: 12,
+    color: C.textSecondary, fontSize: 12,
     textTransform: "uppercase", letterSpacing: 0.6,
     marginTop: 32, marginBottom: 8, paddingHorizontal: 4,
   },
-  docList: { backgroundColor: theme.colors.card, borderRadius: theme.radius.md, paddingHorizontal: 16 },
+  docList: { backgroundColor: C.card, borderRadius: 14, paddingHorizontal: 16, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
   docRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14, gap: 10 },
-  docRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
+  docRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.divider },
   docDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-  docName: { color: theme.colors.text, fontSize: 15 },
-  docNumber: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 2, fontFamily: "monospace" },
+  docName: { color: C.text, fontSize: 15 },
+  docNumber: { color: C.textSecondary, fontSize: 12, marginTop: 2, fontFamily: "monospace" },
   docExpiry: { fontSize: 12, fontWeight: "500" },
   daysLeft: { fontSize: 11, marginTop: 2 },
 });
