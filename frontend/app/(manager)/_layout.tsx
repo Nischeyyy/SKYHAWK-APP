@@ -1,62 +1,18 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { theme } from "@/src/theme";
-import { Platform, View, StyleSheet } from "react-native";
-import * as Haptics from "expo-haptics";
-import { BlurView } from "expo-blur";
-
-function TabBg() {
-  const style = {
-    backgroundColor: "#141414",
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderLeftWidth: StyleSheet.hairlineWidth,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.1)",
-  } as const;
-  if (Platform.OS === "web") {
-    return <View style={[StyleSheet.absoluteFill, style]} />;
-  }
-  return (
-    <View style={StyleSheet.absoluteFill}>
-      <BlurView intensity={60} tint="dark" style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: "hidden" }]} />
-      <View style={[StyleSheet.absoluteFill, style, { backgroundColor: "rgba(20,20,20,0.7)" }]} />
-    </View>
-  );
-}
-
-const tapHaptic = () => {
-  if (Platform.OS === "web") return;
-  try { Haptics.selectionAsync(); } catch {}
-};
+import { LiquidTabBar } from "@/src/ui/LiquidTabBar";
 
 export default function ManagerLayout() {
   return (
     <Tabs
-      screenListeners={{ tabPress: tapHaptic }}
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: theme.colors.accent,
-        tabBarInactiveTintColor: theme.colors.textTertiary,
-        tabBarBackground: () => <TabBg />,
-        tabBarStyle: {
-          position: "absolute",
-          borderTopWidth: 0,
-          backgroundColor: "transparent",
-          elevation: 0,
-          height: Platform.OS === "ios" ? 88 : 68,
-          paddingTop: 10,
-          paddingBottom: Platform.OS === "ios" ? 28 : 10,
-        },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "500", marginTop: 3 },
-      }}
+      tabBar={(props) => <LiquidTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
-      <Tabs.Screen name="index" options={{ title: "Overview", tabBarIcon: ({ color }) => <Ionicons name="grid-outline" size={22} color={color} /> }} />
-      <Tabs.Screen name="guards" options={{ title: "Guards", tabBarIcon: ({ color }) => <Ionicons name="people-outline" size={22} color={color} /> }} />
-      <Tabs.Screen name="schedule" options={{ title: "Schedule", tabBarIcon: ({ color }) => <Ionicons name="calendar-outline" size={22} color={color} /> }} />
-      <Tabs.Screen name="ops" options={{ title: "Operations", tabBarIcon: ({ color }) => <Ionicons name="megaphone-outline" size={22} color={color} /> }} />
-      <Tabs.Screen name="finance" options={{ title: "Finance", tabBarIcon: ({ color }) => <Ionicons name="wallet-outline" size={22} color={color} /> }} />
+      <Tabs.Screen name="index" options={{ title: "Overview", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "grid" : "grid-outline"} size={22} color={color} /> }} />
+      <Tabs.Screen name="guards" options={{ title: "Guards", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "people" : "people-outline"} size={22} color={color} /> }} />
+      <Tabs.Screen name="schedule" options={{ title: "Schedule", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "calendar" : "calendar-outline"} size={22} color={color} /> }} />
+      <Tabs.Screen name="ops" options={{ title: "Operations", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "megaphone" : "megaphone-outline"} size={22} color={color} /> }} />
+      <Tabs.Screen name="finance" options={{ title: "Finance", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "wallet" : "wallet-outline"} size={22} color={color} /> }} />
     </Tabs>
   );
 }
