@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useRef, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator, Animated, Linking, Modal, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator, Animated, Linking, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -127,35 +127,26 @@ export default function Dashboard() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={{ opacity: fade }}>
-          {/* Brand header */}
-          <View style={styles.brandHeader}>
-            <View style={styles.brandLeft}>
-              <Image source={require("@/assets/images/skyhawk-logo.png")} style={styles.brandLogo} resizeMode="contain" />
-              <View>
-                <Text style={styles.brandTitle}>SKYHAWK</Text>
-                <Text style={styles.brandSub}>SECURITY SERVICES</Text>
-              </View>
+          {/* Greeting + profile row */}
+          <View style={styles.headerRow}>
+            <View style={styles.greetBlock}>
+              <Text style={styles.greetText}>{greetingLabel()}</Text>
+              <Text style={styles.nameText}>{firstName}</Text>
             </View>
-            <View style={styles.brandRight}>
+            <View style={styles.headerPill}>
               <Pressable
                 testID="announcements-btn"
                 onPress={() => { tap(); router.push("/announcements"); }}
                 hitSlop={10}
                 style={styles.bellBtn}
               >
-                <Ionicons name="notifications-outline" size={20} color={light.text} />
+                <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
                 {data?.unread_announcements > 0 && <View style={styles.bellDot} />}
               </Pressable>
               <Pressable testID="profile-avatar-btn" onPress={() => { tap(); router.push("/(tabs)/profile"); }}>
                 <Avatar name={user?.full_name} size={40} />
               </Pressable>
             </View>
-          </View>
-
-          {/* Greeting */}
-          <View style={styles.greetWrap}>
-            <Text style={styles.greetText}>{greetingLabel()}</Text>
-            <Text style={styles.nameText}>{firstName}</Text>
           </View>
 
           {/* Today's Assignment */}
@@ -355,21 +346,28 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: light.bg },
   container: { paddingHorizontal: 20, paddingBottom: 140 },
 
-  brandHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 14 },
-  brandLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  brandLogo: { width: 36, height: 36 },
-  brandTitle: { color: light.text, fontSize: 15, fontWeight: "800", letterSpacing: 0.5 },
-  brandSub: { color: light.textSecondary, fontSize: 10, fontWeight: "600", letterSpacing: 0.4, marginTop: 1 },
-  brandRight: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 14, marginBottom: 22 },
+  greetBlock: { justifyContent: "center" },
+  greetText: { color: light.textSecondary, fontSize: 14 },
+  nameText: { color: light.text, fontSize: 28, fontWeight: "800", marginTop: 2, letterSpacing: -0.5 },
+
+  headerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#000000",
+    paddingVertical: 8,
+    paddingLeft: 16,
+    paddingRight: 20,
+    marginRight: -20,
+    borderTopLeftRadius: 999,
+    borderBottomLeftRadius: 999,
+  },
   bellBtn: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: "#FFFFFF",
-    borderWidth: 1, borderColor: light.cardBorder, alignItems: "center", justifyContent: "center",
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: "center", justifyContent: "center",
   },
   bellDot: { position: "absolute", top: 9, right: 10, width: 7, height: 7, borderRadius: 3.5, backgroundColor: light.accentRed },
-
-  greetWrap: { marginTop: 26, marginBottom: 22 },
-  greetText: { color: light.textSecondary, fontSize: 14 },
-  nameText: { color: light.text, fontSize: 32, fontWeight: "800", marginTop: 2, letterSpacing: -0.5 },
 
   sectionLabel: { color: light.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase" },
 
