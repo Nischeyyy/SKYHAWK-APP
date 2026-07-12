@@ -8,18 +8,7 @@ import { Avatar } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
 import { tap, warn as hapticWarn } from "@/src/utils/haptics";
-
-const light = {
-  bg: "#FFFFFF",
-  card: "#FFFFFF",
-  cardBorder: "#ECECEE",
-  chip: "#F5F5F7",
-  text: "#0B0B0C",
-  textSecondary: "#8A8A8E",
-  textTertiary: "#B0B0B4",
-  accentRed: "#E13B3B",
-  black: "#111112",
-};
+import { light } from "@/src/theme/light";
 
 function greetingLabel() {
   const h = new Date().getHours();

@@ -594,9 +594,18 @@ async def dashboard(user=Depends(get_current_user)):
 async def schedule(
     user=Depends(get_current_user),
     range: str = Query("week"),  # week|month
+    start: Optional[str] = None,
+    end: Optional[str] = None,
 ):
     now = now_utc()
-    if range == "month":
+    if start and end:
+        start = datetime.fromisoformat(start)
+        end = datetime.fromisoformat(end)
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+    elif range == "month":
         start = now - timedelta(days=15)
         end = now + timedelta(days=30)
     else:
