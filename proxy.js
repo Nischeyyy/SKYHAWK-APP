@@ -42,6 +42,12 @@ function forward(req, res, targetPort) {
 const server = http.createServer((req, res) => {
   const url = req.url || '/';
   const isApi = url.startsWith('/api') || url.startsWith('/docs') || url.startsWith('/openapi.json');
+  // Strip Origin/Referer when forwarding to the Expo dev server so its
+  // built-in CORS middleware doesn't reject Replit-proxied requests.
+  if (!isApi) {
+    delete req.headers['origin'];
+    delete req.headers['referer'];
+  }
   forward(req, res, isApi ? BACKEND_PORT : FRONTEND_PORT);
 });
 
