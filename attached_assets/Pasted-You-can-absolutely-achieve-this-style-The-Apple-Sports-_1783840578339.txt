@@ -1,0 +1,473 @@
+You can absolutely achieve this style. The Apple Sports app is one of the best examples of Apple's 2026 design language.
+
+However, **don't copy it 1:1**. Apple can enforce its own design language; third-party apps that mimic it too closely risk looking derivative. Instead, borrow the principles and adapt them to Skyhawk.
+
+## The design language you want
+
+### 1. Monochromatic brand color
+
+Instead of black everywhere, use a **very dark navy**.
+
+```
+Background
+#08101D
+
+Card
+#0E1830
+
+Elevated Card
+#142242
+
+Accent
+#2F6BFF
+
+Text
+#FFFFFF
+
+Secondary
+rgba(255,255,255,0.65)
+```
+
+The Sports app doesn't actually use bright blue. It uses layered navy surfaces.
+
+---
+
+## 2. Floating Glass Navigation
+
+Instead of
+
+```
+Wallet
+```
+
+Use
+
+```
+        Skyhawk
+
+      Today  Schedule
+
+⚙︎               Profile
+```
+
+Everything floating.
+
+Large spacing.
+
+---
+
+## 3. Large Containers
+
+Apple Sports groups everything into huge rounded rectangles.
+
+Instead of
+
+```
+Today's Shift
+
+Toronto Financial Tower
+
+Clock In
+```
+
+Think
+
+```
+╭────────────────────────────╮
+
+ Today's Assignment
+
+ Toronto Financial Tower
+
+ Concierge
+
+ 2PM–10PM
+
+      Clock In
+
+╰────────────────────────────╯
+```
+
+Radius around **28–32pt**.
+
+---
+
+## 4. Beautiful Segmented Controls
+
+Instead of standard iOS segmented controls.
+
+```
+Week   Month
+```
+
+Use
+
+```
+╭──────────────────────╮
+
+ Week    Month
+
+╰──────────────────────╯
+```
+
+Background
+
+```
+#16254A
+```
+
+Selected
+
+```
+White
+
+or
+
+Blue
+```
+
+Exactly like Sports.
+
+---
+
+## 5. Cards with Depth
+
+Not flat.
+
+```
+Background
+
+↓
+
+Soft gradient
+
+↓
+
+Very thin border
+
+↓
+
+Shadow
+
+↓
+
+Highlight
+```
+
+Apple almost never uses a completely flat color.
+
+---
+
+## 6. Large Header
+
+Instead of
+
+```
+Today
+```
+
+```
+Good Morning
+
+Marcus
+
+Today's Assignment
+```
+
+Large typography.
+
+Exactly how Sports says
+
+```
+Apple Sports
+```
+
+---
+
+## 7. Huge Primary Card
+
+Your current Today page
+
+```
+Clock In
+
+SOS
+
+Dispatch
+
+Report
+```
+
+Instead
+
+```
+╭────────────────────────────╮
+
+Today's Shift
+
+Toronto Financial Tower
+
+2:00 PM–10:00 PM
+
+Clock In
+
+╰────────────────────────────╯
+
+SOS Dispatch Report
+```
+
+The current shift becomes the hero.
+
+---
+
+## 8. Glass Buttons
+
+Like Sports
+
+```
+╭──────────╮
+
+Settings
+
+╰──────────╯
+```
+
+Blur
+
+Thin border
+
+Gradient
+
+---
+
+## 9. Large Rounded Buttons
+
+Current
+
+```
+Claim Shift
+```
+
+New
+
+```
+╭─────────────────────╮
+
+ Claim Shift
+
+╰─────────────────────╯
+```
+
+Height
+
+56–60pt
+
+Radius
+
+18–20pt
+
+---
+
+## 10. Wallet
+
+This page would become gorgeous.
+
+```
+Wallet
+
+╭───────────────────────╮
+
+Marcus Vance
+
+Verified
+
+QR
+
+╰───────────────────────╯
+
+Credentials
+
+╭──────────────╮
+
+Ontario License
+
+Expires Aug 22
+
+╰──────────────╯
+
+╭──────────────╮
+
+First Aid
+
+╰──────────────╯
+```
+
+Exactly the Sports grouping.
+
+---
+
+# Animation
+
+Sports feels premium because nothing appears instantly.
+
+Everything:
+
+* fades
+* slides
+* expands
+* blurs
+
+Button press
+
+```
+Scale
+
+100%
+
+↓
+
+96%
+
+↓
+
+100%
+```
+
+Card
+
+```
+Opacity
+
+0
+
+↓
+
+100
+```
+
+---
+
+# Navigation Bar
+
+Instead of
+
+```
+Today
+
+Schedule
+
+Wallet
+```
+
+Use floating glass.
+
+Almost like
+
+Music
+
+Photos
+
+Sports
+
+---
+
+# Icons
+
+Everything SF Symbols.
+
+```
+building.2
+
+shield.checkered
+
+person.badge.key
+
+qrcode
+
+clock
+
+location
+
+bolt
+
+calendar
+
+wallet.pass
+
+lock.shield
+```
+
+---
+
+# Color
+
+I wouldn't copy the blue.
+
+I'd make Skyhawk
+
+```
+Black
+
+↓
+
+Midnight Navy
+
+↓
+
+Electric Blue
+```
+
+Think
+
+```
+Apple Sports
+
++
+
+Wallet
+
++
+
+Apple TV
+
++
+
+Fitness
+```
+
+Not
+
+```
+Police app
+```
+
+---
+
+# The style I'd build for Skyhawk
+
+| Element    | Style                   |
+| ---------- | ----------------------- |
+| Background | Midnight Navy (#08101D) |
+| Cards      | Layered dark blue       |
+| Glass      | Ultra Thin Material     |
+| Radius     | 28–32pt                 |
+| Accent     | Apple Blue (#0A84FF)    |
+| Typography | SF Pro Display          |
+| Buttons    | Large capsule           |
+| Motion     | Spring animations       |
+| Shadows    | Very soft               |
+| Borders    | 1px white at 8% opacity |
+
+## I would go one step further
+
+I would make the app feel like **Apple built a security operations app**.
+
+That means:
+
+* Apple Sports-style navigation and cards.
+* Wallet-style credential presentation.
+* Fitness-style activity rings for hours worked, certifications, or weekly shifts.
+* Maps-style bottom sheets for shift details and incident reporting.
+* Journal-style generous spacing and typography.
+
+Done well, this would feel like a first-party iOS app while still having a distinct Skyhawk identity, rather than looking like a direct clone of Apple Sports.
