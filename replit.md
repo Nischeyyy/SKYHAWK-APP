@@ -14,7 +14,7 @@ A workforce management app for security guards — shift scheduling, time clock,
 
 Two workflows must be running:
 
-1. **Backend API** — `cd backend && uvicorn server:app --host 0.0.0.0 --port 8000 --reload`
+1. **Backend API** — `cd backend && PATH=$HOME/.pythonlibs/bin:$PATH uvicorn server:app --host 0.0.0.0 --port 8000 --reload`
 2. **Start application** — `node proxy.js & cd frontend && bash start.sh`
 
 The webview shows the Expo web app at port 5000.
