@@ -27,6 +27,10 @@ args = "Backend API"
 task = "workflow.run"
 args = "Start application"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Expo Go"
+
 [[workflows.workflow]]
 name = "Backend API"
 author = "agent"
@@ -51,6 +55,18 @@ task = "shell.exec"
 args = "node proxy.js & cd frontend && bash start.sh"
 waitForPort = 5000
 
+[[workflows.workflow]]
+name = "Expo Go"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd frontend && EXPO_PUBLIC_BACKEND_URL=https://$REPLIT_DEV_DOMAIN npx expo start --tunnel --port 8099"
+waitForPort = 8099
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[ports]]
 localPort = 5000
 externalPort = 80
@@ -62,3 +78,7 @@ externalPort = 8000
 [[ports]]
 localPort = 8080
 externalPort = 8080
+
+[[ports]]
+localPort = 8099
+externalPort = 8099
