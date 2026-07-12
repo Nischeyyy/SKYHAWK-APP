@@ -27,9 +27,9 @@ const C = {
 
 // ─── Quick actions ──────────────────────────────────────────────────────────
 const ACTIONS = [
-  { id: "emergency", icon: "shield-outline" as const, label: "Emergency", sub: "Get immediate help", iconColor: C.red,  iconBg: "rgba(225,59,59,0.10)",  route: "/sos"       },
-  { id: "dispatch",  icon: "radio-outline"  as const, label: "Dispatch",  sub: "Call dispatch",      iconColor: C.blue, iconBg: "rgba(10,132,255,0.10)", phone: "+14165550100" },
-  { id: "report",    icon: "document-text-outline" as const, label: "Report", sub: "Submit a report", iconColor: C.text, iconBg: "rgba(0,0,0,0.06)",    route: "/incidents" },
+  { id: "employment", icon: "briefcase-outline" as const, label: "Employment", sub: "Status & role", iconColor: C.blue, iconBg: "rgba(10,132,255,0.10)", route: "/employment" },
+  { id: "payroll",     icon: "cash-outline"      as const, label: "Payroll",    sub: "Pay & stubs",   iconColor: C.green, iconBg: "rgba(47,174,89,0.10)", route: "/payroll"    },
+  { id: "settings",    icon: "settings-outline"  as const, label: "Settings",   sub: "Preferences",   iconColor: C.text, iconBg: "rgba(0,0,0,0.06)",     route: "/settings"   },
 ];
 
 function ActionCell({ item, onPress, isLast }: { item: typeof ACTIONS[0]; onPress: () => void; isLast: boolean }) {
@@ -79,7 +79,7 @@ export default function Profile() {
 
   const handleAction = (item: typeof ACTIONS[0]) => {
     if (item.route) router.push(item.route as any);
-    else if (item.phone) Linking.openURL(`tel:${item.phone}`);
+    else if ((item as any).phone) Linking.openURL(`tel:${(item as any).phone}`);
   };
 
   return (
@@ -91,7 +91,7 @@ export default function Profile() {
           <Pressable hitSlop={10} style={s.navIconBtn}>
             <Ionicons name="notifications-outline" size={22} color={C.text} />
           </Pressable>
-          <Pressable hitSlop={10} style={s.navIconBtn}>
+          <Pressable hitSlop={10} style={s.navIconBtn} onPress={() => router.push("/settings")}>
             <Ionicons name="settings-outline" size={22} color={C.text} />
           </Pressable>
         </View>
