@@ -426,8 +426,9 @@ const styles = StyleSheet.create({
   },
   clockInText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 
-  actionsRow: { flexDirection: "row", gap: 12, marginTop: 22 },
+  actionsRow: { flexDirection: "row", gap: 12, marginTop: 22, alignItems: "stretch" },
   actionCard: {
+    flex: 1,
     backgroundColor: light.card,
     borderRadius: 16,
     borderWidth: 1,
@@ -435,6 +436,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 10,
     alignItems: "center",
+    justifyContent: "center",
   },
   actionCardDanger: {
     backgroundColor: light.accentRed,
