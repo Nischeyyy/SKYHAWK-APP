@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
+import { View, StyleSheet, Pressable, Platform } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
@@ -44,9 +44,6 @@ export function LiquidTabBar({ state, descriptors, navigation }: BottomTabBarPro
             return (
               <Pressable key={route.key} onPress={onPress} style={styles.item} hitSlop={0}>
                 <View style={styles.iconWrap}>{icon}</View>
-                <Text numberOfLines={1} style={[styles.label, focused && styles.labelActive]}>
-                  {String(options.title ?? route.name)}
-                </Text>
               </Pressable>
             );
           })}
@@ -90,16 +87,5 @@ const styles = StyleSheet.create({
   iconWrap: {
     alignItems: "center",
     justifyContent: "center",
-    height: 26,
-  },
-  label: {
-    color: "rgba(255,255,255,0.42)",
-    fontSize: 10,
-    fontWeight: "600",
-    letterSpacing: 0.1,
-    marginTop: 2,
-  },
-  labelActive: {
-    color: "#FFFFFF",
   },
 });
