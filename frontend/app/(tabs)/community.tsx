@@ -180,11 +180,11 @@ export default function Community() {
                   testID="post-btn"
                   onPress={submitPost}
                   disabled={!draft.trim() || posting}
-                  style={[styles.postBtn, (!draft.trim() || posting) && { opacity: 0.4 }]}
+                  style={[styles.postBtn, (!draft.trim() || posting) && styles.postBtnDisabled]}
                 >
                   {posting
-                    ? <ActivityIndicator color="#FFFFFF" size="small" />
-                    : <Text style={styles.postBtnText}>Post</Text>}
+                    ? <ActivityIndicator color={C.accent} size="small" />
+                    : <Text style={[styles.postBtnText, (!draft.trim()) && styles.postBtnTextDisabled]}>Post</Text>}
                 </Pressable>
               </View>
             </View>
@@ -201,7 +201,7 @@ export default function Community() {
                       onPress={() => setFilter(f.key)}
                       style={[styles.chip, active && styles.chipActive]}
                     >
-                      {f.icon && <Ionicons name={f.icon} size={13} color={active ? "#FFFFFF" : C.textSecondary} />}
+                      {f.icon && <Ionicons name={f.icon} size={13} color={active ? "#FFFFFF" : C.accent} />}
                       <Text style={[styles.chipText, active && styles.chipTextActive]}>{f.label}</Text>
                     </Pressable>
                   );
@@ -328,10 +328,12 @@ const styles = StyleSheet.create({
   composerToolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.divider },
   postBtn: { backgroundColor: C.accent, paddingHorizontal: 20, paddingVertical: 9, borderRadius: 20, minWidth: 66, alignItems: "center" },
   postBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "600" },
+  postBtnDisabled: { backgroundColor: C.accentSoft },
+  postBtnTextDisabled: { color: C.accent, opacity: 0.5 },
 
-  chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.card, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.accentSoft, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20 },
   chipActive: { backgroundColor: C.accent },
-  chipText: { color: C.textSecondary, fontSize: 13, fontWeight: "500" },
+  chipText: { color: C.accent, fontSize: 13, fontWeight: "500" },
   chipTextActive: { color: "#FFFFFF" },
 
   empty: { color: C.textSecondary, textAlign: "center", marginTop: 40, fontSize: 15 },
