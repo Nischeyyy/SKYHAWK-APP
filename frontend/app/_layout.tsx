@@ -12,6 +12,7 @@ import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
 import { theme } from "@/src/theme";
 import { api, getToken } from "@/src/api/client";
+import { ErrorBoundary } from "@/src/components/ErrorBoundary";
 
 LogBox.ignoreAllLogs(true);
 
@@ -115,13 +116,15 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.bg }}>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <StatusBar style="light" />
-          <AuthGate />
-        </AuthProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.bg }}>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <StatusBar style="light" />
+            <AuthGate />
+          </AuthProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }

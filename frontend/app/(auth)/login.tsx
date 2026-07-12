@@ -7,7 +7,7 @@ import { Button } from "@/src/ui";
 import { useAuth } from "@/src/auth/AuthContext";
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, sessionExpired, clearSessionExpired } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("guard@skyhawk.com");
   const [password, setPassword] = useState("Password123");
@@ -16,6 +16,7 @@ export default function Login() {
 
   const submit = async () => {
     setError(null);
+    clearSessionExpired();
     setLoading(true);
     try {
       await login(email.trim(), password);
@@ -35,6 +36,11 @@ export default function Login() {
             <Text style={styles.brandSub}>Security Operations</Text>
           </View>
 
+          {sessionExpired && (
+            <View style={{ backgroundColor: '#1a1a1a', borderRadius: 10, padding: 12, marginBottom: 16, borderLeftWidth: 3, borderLeftColor: '#ff6b6b' }}>
+              <Text style={{ color: '#ff6b6b', fontSize: 13, textAlign: 'center' }}>Your session expired. Please sign in again.</Text>
+            </View>
+          )}
           <View style={styles.form}>
             <Text style={styles.label}>Email</Text>
             <TextInput

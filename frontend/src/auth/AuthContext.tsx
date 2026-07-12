@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { api, setToken, getToken } from '../api/client';
+import { api, setToken, getToken, setUnauthorizedHandler } from '../api/client';
 
 type User = {
   id: string;
@@ -20,6 +20,9 @@ type User = {
 type AuthCtx = {
   user: User | null;
   loading: boolean;
+  /** True when the server rejected a previously-valid token (e.g. secret rotated). */
+  sessionExpired: boolean;
+  clearSessionExpired: () => void;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, full_name: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -31,6 +34,7 @@ const Ctx = createContext<AuthCtx | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -45,6 +49,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await setToken(null);
       setUser(null);
     }
+  }, []);
+
+  // Register the global 401 handler so any screen's api() call can clear the session.
+  useEffect(() => {
+    setUnauthorizedHandler(async () => {
+      await setToken(null);
+      setUser(null);
+      setSessionExpired(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -62,9 +75,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     await setToken(r.access_token);
     setUser(r.user);
+    setSessionExpired(false);
   };
 
-  const register = async (email: string, password: string, full_name: string, phone?: string) => {
+  const register = async (
+    email: string,
+    password: string,
+    full_name: string,
+    phone?: string
+  ) => {
     const r = await api<{ access_token: string; user: User }>('/auth/register', {
       method: 'POST',
       body: { email, password, full_name, phone },
@@ -72,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     await setToken(r.access_token);
     setUser(r.user);
+    setSessionExpired(false);
   };
 
   const logout = async () => {
@@ -79,8 +99,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  const clearSessionExpired = useCallback(() => setSessionExpired(false), []);
+
   return (
-    <Ctx.Provider value={{ user, loading, login, register, logout, refresh }}>
+    <Ctx.Provider
+      value={{ user, loading, sessionExpired, clearSessionExpired, login, register, logout, refresh }}
+    >
       {children}
     </Ctx.Provider>
   );

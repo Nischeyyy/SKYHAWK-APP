@@ -3,38 +3,91 @@ JWT-based authentication, shift management, time clock, wallet, incidents, payro
 """
 import os
 import uuid
+import json
 import logging
 from pathlib import Path
 from datetime import datetime, timedelta, timezone, date
-from typing import Optional, List
+from typing import Optional, List, Annotated
 from contextlib import asynccontextmanager
 
 import jwt
 import bcrypt
 import httpx
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from pydantic import BaseModel, EmailStr, Field
+from pymongo.errors import PyMongoError, ServerSelectionTimeoutError  # noqa: F401
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ["DB_NAME"]
-JWT_SECRET = os.environ["JWT_SECRET"]
+def _require_env(key: str) -> str:
+    """Read a required environment variable; fail fast with a clear message if absent."""
+    v = os.environ.get(key)
+    if not v:
+        raise RuntimeError(
+            f"Required environment variable '{key}' is not set. "
+            "Add it to Replit Secrets and restart."
+        )
+    return v
+
+
+MONGO_URL = _require_env("MONGO_URL")
+DB_NAME = _require_env("DB_NAME")
+JWT_SECRET = _require_env("JWT_SECRET")
 JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
-JWT_EXPIRE_HOURS = int(os.environ.get("JWT_EXPIRE_HOURS", 168))
+JWT_EXPIRE_HOURS = int(os.environ.get("JWT_EXPIRE_HOURS", "168"))
 EMERGENT_PUSH_KEY = os.environ.get("EMERGENT_PUSH_KEY", "placeholder")
 PUSH_BASE_URL = "https://integrations.emergentagent.com"
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+class _JSONFormatter(logging.Formatter):
+    """Emit one JSON object per log line for easy machine parsing."""
+    _SKIP = frozenset(logging.LogRecord.__dict__) | {
+        "args", "msg", "message", "taskName",
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        record.message = record.getMessage()
+        doc: dict = {
+            "ts": self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%SZ"),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.message,
+        }
+        if record.exc_info:
+            doc["exception"] = self.formatException(record.exc_info)
+        extra = {k: v for k, v in record.__dict__.items() if k not in self._SKIP}
+        if extra:
+            doc["extra"] = extra
+        return json.dumps(doc)
+
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_JSONFormatter())
+logging.root.handlers = [_handler]
+logging.root.setLevel(logging.INFO)
 logger = logging.getLogger("skyhawk")
 
-client = AsyncIOMotorClient(MONGO_URL)
+client = AsyncIOMotorClient(
+    MONGO_URL,
+    serverSelectionTimeoutMS=5_000,   # fail fast if Atlas is unreachable
+    connectTimeoutMS=10_000,
+    socketTimeoutMS=30_000,
+    maxPoolSize=50,
+    minPoolSize=5,
+    retryWrites=True,
+)
 db = client[DB_NAME]
+
+# Rate limiter — shared across all routes
+limiter = Limiter(key_func=get_remote_address, default_limits=["300/minute"])
 
 push_client = httpx.AsyncClient(
     base_url=PUSH_BASE_URL,
@@ -159,15 +212,17 @@ class AckIn(BaseModel):
     pass
 
 
+_Photo = Annotated[str, Field(max_length=500_000)]  # ~375 KB per image
+
 class IncidentIn(BaseModel):
-    type: str  # incident|injury|lost_found|property_damage
-    site_id: Optional[str] = None
-    description: str
-    severity: str = "medium"  # low|medium|high|critical
-    witness_name: Optional[str] = None
-    witness_contact: Optional[str] = None
-    photos: List[str] = []  # base64
-    signature_base64: Optional[str] = None
+    type: str = Field(max_length=50)  # incident|injury|lost_found|property_damage
+    site_id: Optional[str] = Field(default=None, max_length=100)
+    description: str = Field(min_length=5, max_length=5_000)
+    severity: str = Field(default="medium", max_length=20)  # low|medium|high|critical
+    witness_name: Optional[str] = Field(default=None, max_length=200)
+    witness_contact: Optional[str] = Field(default=None, max_length=200)
+    photos: List[_Photo] = Field(default=[], max_length=5)  # max 5 base64 images
+    signature_base64: Optional[str] = Field(default=None, max_length=500_000)
 
 
 class RegisterPushIn(BaseModel):
@@ -189,15 +244,54 @@ class SiteAckIn(BaseModel):
 # ============================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await ensure_indexes()
-    await seed_data()
+    try:
+        await ensure_indexes()
+        logger.info("Database indexes ensured")
+    except Exception as exc:
+        logger.error("Failed to create DB indexes — check MONGO_URL: %s", exc)
+    try:
+        await seed_data()
+    except Exception as exc:
+        logger.error("Failed to seed demo data: %s", exc)
     yield
     client.close()
     await push_client.aclose()
 
 
 app = FastAPI(title="Skyhawk Ops API", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all for unhandled exceptions — log with context, return a safe 500."""
+    if isinstance(exc, HTTPException):
+        raise exc
+    logger.error(
+        "Unhandled exception on %s %s",
+        request.method,
+        request.url.path,
+        exc_info=exc,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Please try again."},
+    )
+
+
 api = APIRouter(prefix="/api")
+
+
+@api.get("/health")
+async def health():
+    """Liveness + readiness probe. Returns 503 if MongoDB is unreachable."""
+    try:
+        await db.command("ping")
+        return {"status": "ok", "database": "connected"}
+    except Exception as exc:
+        logger.warning("Health check failed: %s", exc)
+        raise HTTPException(status_code=503, detail="Database unavailable")
 
 
 async def ensure_indexes():
@@ -479,7 +573,8 @@ async def root():
 
 
 @api.post("/auth/register", response_model=AuthOut)
-async def register(body: RegisterIn):
+@limiter.limit("5/minute")
+async def register(request: Request, body: RegisterIn):
     existing = await db.users.find_one({"email": body.email.lower()})
     if existing:
         raise HTTPException(400, "Email already registered")
@@ -509,7 +604,8 @@ async def register(body: RegisterIn):
 
 
 @api.post("/auth/login", response_model=AuthOut)
-async def login(body: LoginIn):
+@limiter.limit("10/minute")
+async def login(request: Request, body: LoginIn):
     user = await db.users.find_one({"email": body.email.lower()})
     if not user or not verify_password(body.password, user["hashed_password"]):
         raise HTTPException(401, "Invalid email or password")
@@ -528,7 +624,8 @@ async def me(user=Depends(get_current_user)):
 # DASHBOARD
 # ============================================================
 @api.get("/dashboard")
-async def dashboard(user=Depends(get_current_user)):
+@limiter.limit("60/minute")
+async def dashboard(request: Request, user=Depends(get_current_user)):
     now = now_utc()
     uid = user["id"]
 

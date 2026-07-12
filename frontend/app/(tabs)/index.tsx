@@ -38,12 +38,14 @@ export default function Dashboard() {
   const [credential, setCredential] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sosOpen, setSosOpen] = useState(false);
   const [sosSubmitting, setSosSubmitting] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
 
   const load = useCallback(async () => {
     try {
+      setLoadError(null);
       const [dash, schedule, wallet] = await Promise.all([
         api("/dashboard"),
         api("/schedule?range=month"),
@@ -59,7 +61,9 @@ export default function Dashboard() {
       const primaryCredential =
         (wallet.documents || []).find((d: any) => d.type === "security_licence") || (wallet.documents || [])[0] || null;
       setCredential(primaryCredential);
-    } catch {}
+    } catch (e: any) {
+      if (e.message !== 'SESSION_EXPIRED') setLoadError(e.message || 'Failed to load dashboard');
+    }
     setLoading(false);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -78,6 +82,21 @@ export default function Dashboard() {
     return (
       <SafeAreaView style={styles.safe}>
         <ActivityIndicator color={light.textSecondary} style={{ marginTop: 60 }} />
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Text style={{ color: light.textSecondary, fontSize: 15, textAlign: 'center', marginBottom: 20 }}>
+            {loadError}
+          </Text>
+          <Pressable onPress={load} style={{ backgroundColor: light.card, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
+            <Text style={{ color: light.text, fontWeight: '600' }}>Retry</Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }

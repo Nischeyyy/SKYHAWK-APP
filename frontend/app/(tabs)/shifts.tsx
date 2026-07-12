@@ -20,7 +20,9 @@ export default function OpenShifts() {
     try {
       const d = await api("/open-shifts");
       setData(d);
-    } catch {}
+    } catch (e: any) {
+      if (e.message !== 'SESSION_EXPIRED') showToast(e.message || 'Failed to load shifts');
+    }
     setLoading(false);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
