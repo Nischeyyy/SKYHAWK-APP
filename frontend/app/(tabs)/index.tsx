@@ -232,8 +232,9 @@ export default function Dashboard() {
               testID="call-dispatch-btn"
               label="Dispatch"
               sub="Call dispatch"
+              tone="green"
               onPress={() => { tap(); Linking.openURL(`tel:${dispatchNumber}`); }}
-              icon={<Ionicons name="radio-outline" size={24} color={light.text} />}
+              icon={<Ionicons name="radio-outline" size={24} color="#fff" />}
             />
             <QuickAction
               testID="create-report-btn"
@@ -342,8 +343,9 @@ export default function Dashboard() {
   );
 }
 
-function QuickAction({ icon, label, sub, onPress, danger, testID }: any) {
+function QuickAction({ icon, label, sub, onPress, danger, tone, testID }: any) {
   const scale = useRef(new Animated.Value(1)).current;
+  const green = tone === "green";
   return (
     <Animated.View style={{ flex: 1, transform: [{ scale }] }}>
       <Pressable
@@ -351,11 +353,11 @@ function QuickAction({ icon, label, sub, onPress, danger, testID }: any) {
         onPress={onPress}
         onPressIn={() => Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, speed: 40 }).start()}
         onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start()}
-        style={[styles.actionCard, danger && styles.actionCardDanger]}
+        style={[styles.actionCard, danger && styles.actionCardDanger, green && styles.actionCardGreen]}
       >
         {icon}
-        <Text style={[styles.actionLabel, danger && styles.actionLabelDanger]}>{label}</Text>
-        <Text style={[styles.actionSub, danger && styles.actionSubDanger]}>{sub}</Text>
+        <Text style={[styles.actionLabel, danger && styles.actionLabelDanger, green && styles.actionLabelGreen]}>{label}</Text>
+        <Text style={[styles.actionSub, danger && styles.actionSubDanger, green && styles.actionSubGreen]}>{sub}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -447,10 +449,21 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
   },
+  actionCardGreen: {
+    backgroundColor: "#2FAE59",
+    borderColor: "#2FAE59",
+    shadowColor: "#2FAE59",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+  },
   actionLabel: { color: light.text, fontSize: 13, fontWeight: "700", marginTop: 8 },
   actionLabelDanger: { color: "#fff" },
+  actionLabelGreen: { color: "#fff" },
   actionSub: { color: light.textSecondary, fontSize: 10, marginTop: 2, textAlign: "center" },
   actionSubDanger: { color: "rgba(255,255,255,0.65)" },
+  actionSubGreen: { color: "rgba(255,255,255,0.65)" },
 
   block: { marginTop: 30 },
   blockHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
