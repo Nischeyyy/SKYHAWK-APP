@@ -6,7 +6,7 @@ export default function ManagerLayout() {
   return (
     <Tabs
       tabBar={(props) => <LiquidTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, animation: "shift" }}
     >
       <Tabs.Screen name="index" options={{ title: "Overview", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "grid" : "grid-outline"} size={22} color={color} /> }} />
       <Tabs.Screen name="guards" options={{ title: "Guards", tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "people" : "people-outline"} size={22} color={color} /> }} />
