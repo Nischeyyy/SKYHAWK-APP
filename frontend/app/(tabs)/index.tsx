@@ -226,7 +226,7 @@ export default function Dashboard() {
               sub="Need immediate help"
               danger
               onPress={() => { tap(); setSosOpen(true); }}
-              icon={<Ionicons name="shield-outline" size={24} color={light.accentRed} />}
+              icon={<Ionicons name="shield-outline" size={24} color="#fff" />}
             />
             <QuickAction
               testID="call-dispatch-btn"
@@ -349,13 +349,13 @@ function QuickAction({ icon, label, sub, onPress, danger, testID }: any) {
       <Pressable
         testID={testID}
         onPress={onPress}
-        onPressIn={() => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 40 }).start()}
+        onPressIn={() => Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, speed: 40 }).start()}
         onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start()}
         style={[styles.actionCard, danger && styles.actionCardDanger]}
       >
         {icon}
         <Text style={[styles.actionLabel, danger && styles.actionLabelDanger]}>{label}</Text>
-        <Text style={styles.actionSub}>{sub}</Text>
+        <Text style={[styles.actionSub, danger && styles.actionSubDanger]}>{sub}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -436,10 +436,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     alignItems: "center",
   },
-  actionCardDanger: {},
+  actionCardDanger: {
+    backgroundColor: light.accentRed,
+    borderColor: light.accentRed,
+    shadowColor: light.accentRed,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+  },
   actionLabel: { color: light.text, fontSize: 13, fontWeight: "700", marginTop: 8 },
-  actionLabelDanger: { color: light.accentRed },
+  actionLabelDanger: { color: "#fff" },
   actionSub: { color: light.textSecondary, fontSize: 10, marginTop: 2, textAlign: "center" },
+  actionSubDanger: { color: "rgba(255,255,255,0.65)" },
 
   block: { marginTop: 30 },
   blockHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },

@@ -1,13 +1,12 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import { LogBox, Platform, View, ActivityIndicator, Pressable, StyleSheet } from "react-native";
+import { LogBox, Platform, View, ActivityIndicator } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { Ionicons } from "@expo/vector-icons";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
@@ -84,43 +83,12 @@ function AuthGate() {
     );
   }
 
-  const showSOS = !!user && user.role !== "admin" && !segments.includes("(auth)") && !segments.includes("sos");
-
   return (
     <View style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.bg }, animation: "fade" }} />
-      {showSOS && (
-        <Pressable
-          onPress={() => router.push("/sos")}
-          style={layoutStyles.sosBtn}
-          accessibilityLabel="SOS Emergency"
-        >
-          <Ionicons name="warning" size={22} color="#fff" />
-        </Pressable>
-      )}
     </View>
   );
 }
-
-const layoutStyles = StyleSheet.create({
-  sosBtn: {
-    position: "absolute",
-    bottom: 96,
-    right: 20,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: theme.colors.danger,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: theme.colors.danger,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 8,
-    zIndex: 999,
-  },
-});
 
 export default function RootLayout() {
   const [loaded, error] = useIconFonts();
