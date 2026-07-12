@@ -1,5 +1,10 @@
 #!/bin/bash
-# Use relative URLs so API calls go through the port-5000 proxy
-echo "EXPO_PUBLIC_BACKEND_URL=" > .env
-# Start expo web on port 8080 (proxied from 5000 via proxy.js)
-CI=1 npx expo start --web --port 8080
+# Set the full public URL so API calls work from Expo Go on a real device
+echo "EXPO_PUBLIC_BACKEND_URL=https://${REPLIT_DEV_DOMAIN}" > .env
+
+# Tell Metro to advertise itself at the Replit Expo domain.
+# Expo Go will connect to: exp://REPLIT_EXPO_DEV_DOMAIN
+export REACT_NATIVE_PACKAGER_HOSTNAME="${REPLIT_EXPO_DEV_DOMAIN}"
+
+# Start without CI=1 so the QR code and hot-reload work
+npx expo start --port 8080
