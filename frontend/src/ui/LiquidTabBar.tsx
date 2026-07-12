@@ -37,9 +37,8 @@ export function LiquidTabBar({ state, descriptors, navigation }: BottomTabBarPro
     itemWidths[index] = width;
     measured.current += 1;
     if (index === state.index) {
-      const capsule = Math.min(width - 14, 58);
-      pillX.value = x + width / 2 - capsule / 2;
-      pillW.value = capsule;
+      pillX.value = x;
+      pillW.value = width;
     }
   };
 
@@ -47,9 +46,8 @@ export function LiquidTabBar({ state, descriptors, navigation }: BottomTabBarPro
     const width = itemWidths[state.index];
     const x = itemX[state.index];
     if (width == null || x == null) return;
-    const capsule = Math.min(width - 14, 58);
-    pillX.value = withSpring(x + width / 2 - capsule / 2, { damping: 18, stiffness: 220, mass: 0.6 });
-    pillW.value = withSpring(capsule, { damping: 18, stiffness: 220, mass: 0.6 });
+    pillX.value = withSpring(x, { damping: 18, stiffness: 220, mass: 0.6 });
+    pillW.value = withSpring(width, { damping: 18, stiffness: 220, mass: 0.6 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.index]);
 
@@ -175,23 +173,29 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-evenly",
+    paddingHorizontal: 6,
   },
   item: {
-    flex: 1,
     height: "100%",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
+    flexShrink: 0,
     gap: 6,
+    paddingHorizontal: 14,
+    minWidth: 44,
   },
   iconWrap: {
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
   label: {
     color: "#FFFFFF",
     fontSize: 12.5,
     fontWeight: "600",
     letterSpacing: 0.1,
+    flexShrink: 0,
   },
 });
