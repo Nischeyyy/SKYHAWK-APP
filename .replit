@@ -59,13 +59,13 @@ waitForPort = 5000
 name = "Expo Go"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd frontend && EXPO_PUBLIC_BACKEND_URL=https://$REPLIT_DEV_DOMAIN npx expo start --tunnel --port 8099"
-waitForPort = 8099
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd frontend && EXPO_PUBLIC_BACKEND_URL=https://$REPLIT_DEV_DOMAIN ./node_modules/.bin/expo start --tunnel --port 8099"
+waitForPort = 8099
 
 [[ports]]
 localPort = 5000
