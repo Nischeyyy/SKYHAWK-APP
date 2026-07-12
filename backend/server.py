@@ -769,6 +769,58 @@ async def schedule(
     return {"shifts": shifts, "range_start": iso(start), "range_end": iso(end)}
 
 
+@api.get("/schedule/stats")
+async def schedule_stats(user=Depends(get_current_user)):
+    """Quick summary card: week hours, week earnings, upcoming count, pending acks, active clock."""
+    now = now_utc()
+    # Week boundaries (Monday start)
+    weekday = now.weekday()
+    week_start = (now - timedelta(days=weekday)).replace(hour=0, minute=0, second=0, microsecond=0)
+    week_end = week_start + timedelta(days=7)
+
+    week_shifts = await db.shifts.find(
+        {"user_id": user["id"], "start": {"$gte": iso(week_start), "$lt": iso(week_end)}},
+        {"_id": 0, "start": 1, "end": 1, "pay_rate": 1, "status": 1, "hours_worked": 1},
+    ).to_list(100)
+
+    week_hours = 0.0
+    week_earnings = 0.0
+    for s in week_shifts:
+        if s.get("hours_worked") is not None:
+            hrs = s["hours_worked"]
+        elif s.get("start") and s.get("end"):
+            try:
+                hrs = (
+                    datetime.fromisoformat(s["end"].replace("Z", "+00:00")) -
+                    datetime.fromisoformat(s["start"].replace("Z", "+00:00"))
+                ).total_seconds() / 3600
+            except Exception:
+                hrs = 0.0
+        else:
+            hrs = 0.0
+        week_hours += hrs
+        week_earnings += hrs * s.get("pay_rate", 0)
+
+    upcoming = await db.shifts.count_documents({
+        "user_id": user["id"], "status": "scheduled", "start": {"$gte": iso(now)},
+    })
+    needs_ack = await db.shifts.count_documents({
+        "user_id": user["id"], "status": "scheduled",
+        "instructions_acknowledged": False, "start": {"$gte": iso(now)},
+    })
+    active_clock = await db.timeclock.find_one(
+        {"user_id": user["id"], "clock_out": None},
+        {"_id": 0, "selfie_in": 0, "selfie_out": 0},
+    )
+    return {
+        "week_hours": round(week_hours, 1),
+        "week_earnings": round(week_earnings, 2),
+        "upcoming_shifts": upcoming,
+        "needs_ack": needs_ack,
+        "active_clock": bool(active_clock),
+    }
+
+
 @api.get("/shifts/{shift_id}")
 async def get_shift(shift_id: str, user=Depends(get_current_user)):
     s = await db.shifts.find_one({"id": shift_id, "user_id": user["id"]}, {"_id": 0})
@@ -843,6 +895,25 @@ async def claim_shift(shift_id: str, user=Depends(get_current_user)):
 async def cancel_claim(shift_id: str, user=Depends(get_current_user)):
     await db.open_shifts.update_one({"id": shift_id}, {"$pull": {"claimed_by": user["id"], "waitlist": user["id"]}})
     await db.shifts.delete_one({"user_id": user["id"], "claimed_from_open": shift_id})
+    # Auto-promote first person on waitlist
+    s = await db.open_shifts.find_one({"id": shift_id})
+    if s:
+        waitlist = s.get("waitlist") or []
+        claimed = s.get("claimed_by") or []
+        if waitlist and len(claimed) < s.get("spots_available", 1):
+            next_uid = waitlist[0]
+            await db.open_shifts.update_one(
+                {"id": shift_id},
+                {"$pull": {"waitlist": next_uid}, "$addToSet": {"claimed_by": next_uid}},
+            )
+            promoted = {
+                "id": str(uuid.uuid4()), "user_id": next_uid, "site_id": s["site_id"],
+                "start": s["start"], "end": s["end"], "role": s["role"],
+                "pay_rate": s["pay_rate"], "status": "scheduled",
+                "claimed_from_open": shift_id, "instructions_acknowledged": False,
+            }
+            await db.shifts.insert_one(promoted)
+            await send_push([next_uid], {"title": "Spot Available!", "message": f"You've been promoted from the waitlist for a {s['role']} shift on {s['start'][:10]}"})
     return {"status": "cancelled"}
 
 
@@ -880,6 +951,7 @@ async def clock_in(body: ClockInIn, user=Depends(get_current_user)):
         raise HTTPException(400, "Already clocked in. Clock out first.")
 
     site = None
+    sh = None
     geofence_ok = True
     distance_m = None
     if body.site_id:
@@ -893,6 +965,18 @@ async def clock_in(body: ClockInIn, user=Depends(get_current_user)):
         distance_m = haversine_m(body.latitude, body.longitude, site["latitude"], site["longitude"])
         geofence_ok = distance_m <= site.get("geofence_radius_m", 200)
 
+    # Detect late clock-in (> 15 min after shift start)
+    late_clock_in = False
+    if sh and sh.get("start"):
+        try:
+            shift_start_dt = datetime.fromisoformat(sh["start"].replace("Z", "+00:00"))
+            if shift_start_dt.tzinfo is None:
+                shift_start_dt = shift_start_dt.replace(tzinfo=timezone.utc)
+            mins_late = (now_utc() - shift_start_dt).total_seconds() / 60
+            late_clock_in = mins_late > 15
+        except Exception:
+            pass
+
     entry = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
@@ -904,6 +988,7 @@ async def clock_in(body: ClockInIn, user=Depends(get_current_user)):
         "selfie_in": body.selfie_base64,
         "geofence_ok": geofence_ok,
         "geofence_distance_m": distance_m,
+        "late_clock_in": late_clock_in,
         "clock_out": None,
         "breaks": [],
         "hours_worked": None,
@@ -911,7 +996,7 @@ async def clock_in(body: ClockInIn, user=Depends(get_current_user)):
     await db.timeclock.insert_one(entry)
     entry.pop("selfie_in", None)
     entry.pop("_id", None)
-    return {"entry": entry, "geofence_ok": geofence_ok, "distance_m": distance_m}
+    return {"entry": entry, "geofence_ok": geofence_ok, "distance_m": distance_m, "late_clock_in": late_clock_in}
 
 
 @api.post("/timeclock/clock-out")
@@ -940,6 +1025,12 @@ async def clock_out(body: ClockOutIn, user=Depends(get_current_user)):
             "hours_worked": hours,
         }},
     )
+    # Auto-complete the associated shift
+    if active.get("shift_id"):
+        await db.shifts.update_one(
+            {"id": active["shift_id"], "status": "scheduled"},
+            {"$set": {"status": "completed", "hours_worked": hours}},
+        )
     return {"hours_worked": hours}
 
 
@@ -1187,6 +1278,7 @@ class AdminCreateShiftIn(BaseModel):
     end: str
     role: str = "Patrol"
     pay_rate: float = 24.50
+    notes: Optional[str] = None
 
 
 class AdminUpdateShiftIn(BaseModel):
@@ -1198,6 +1290,7 @@ class AdminUpdateShiftIn(BaseModel):
     pay_rate: Optional[float] = None
     status: Optional[str] = None
     hours_worked: Optional[float] = None
+    notes: Optional[str] = None
 
 
 class AdminCreateOpenShiftIn(BaseModel):
@@ -1412,9 +1505,19 @@ async def admin_create_shift(body: AdminCreateShiftIn, admin=Depends(require_adm
         raise HTTPException(404, "Guard not found")
     if not await db.sites.find_one({"id": body.site_id}):
         raise HTTPException(404, "Site not found")
+    # Conflict detection: guard must not have an overlapping scheduled shift
+    overlap = await db.shifts.find_one({
+        "user_id": body.user_id,
+        "status": {"$ne": "cancelled"},
+        "start": {"$lt": body.end},
+        "end": {"$gt": body.start},
+    })
+    if overlap:
+        raise HTTPException(409, f"Scheduling conflict: guard already has a shift from {overlap['start'][:16]} to {overlap['end'][:16]}.")
     shift = {
         "id": str(uuid.uuid4()), "user_id": body.user_id, "site_id": body.site_id,
         "start": body.start, "end": body.end, "role": body.role, "pay_rate": body.pay_rate,
+        "notes": body.notes,
         "status": "scheduled", "instructions_acknowledged": False,
         "created_by": admin["id"], "created_at": iso(now_utc()),
     }

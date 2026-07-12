@@ -9,66 +9,50 @@ import { tap } from "@/src/utils/haptics";
 
 type ViewMode = "week" | "month" | "calendar";
 
-function startOfDay(d: Date): Date {
-  const n = new Date(d);
-  n.setHours(0, 0, 0, 0);
-  return n;
-}
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
-function startOfWeek(d: Date): Date {
-  const n = startOfDay(d);
-  return addDays(n, -n.getDay());
-}
-function isSameDay(a: Date, b: Date): boolean {
-  return a.toDateString() === b.toDateString();
-}
-function dateKey(d: Date): string {
-  return d.toDateString();
-}
-function fmtShiftTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-}
+function startOfDay(d: Date): Date { const n = new Date(d); n.setHours(0,0,0,0); return n; }
+function addDays(d: Date, n: number): Date { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function startOfWeek(d: Date): Date { const n = startOfDay(d); return addDays(n, -n.getDay()); }
+function isSameDay(a: Date, b: Date): boolean { return a.toDateString() === b.toDateString(); }
+function dateKey(d: Date): string { return d.toDateString(); }
+function fmtTime(iso: string): string { return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }); }
 function fmtWeekRange(start: Date, end: Date): string {
   const last = addDays(end, -1);
   const sameMonth = start.getMonth() === last.getMonth();
-  const startStr = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const endStr = last.toLocaleDateString("en-US", sameMonth ? { day: "numeric" } : { month: "short", day: "numeric" });
-  return `${startStr} \u2013 ${endStr}, ${last.getFullYear()}`;
+  const s = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const e = last.toLocaleDateString("en-US", sameMonth ? { day: "numeric" } : { month: "short", day: "numeric" });
+  return `${s} \u2013 ${e}, ${last.getFullYear()}`;
 }
-function fmtDayLabel(d: Date): string {
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
+function fmtDayLabel(d: Date): string { return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase(); }
+function fmtMonthYear(d: Date): string { return d.toLocaleDateString("en-US", { month: "long", year: "numeric" }); }
+function shiftDuration(start: string, end: string): string {
+  const hrs = (new Date(end).getTime() - new Date(start).getTime()) / 3600000;
+  return hrs % 1 === 0 ? `${hrs}h` : `${hrs.toFixed(1)}h`;
 }
-function fmtMonthYear(d: Date): string {
-  return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+function estEarnings(start: string, end: string, rate: number): string {
+  const hrs = (new Date(end).getTime() - new Date(start).getTime()) / 3600000;
+  return `$${(hrs * rate).toFixed(0)}`;
 }
 
-const DOW = ["S", "M", "T", "W", "T", "F", "S"];
-const DOW_FULL = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const DOW = ["S","M","T","W","T","F","S"];
+const DOW_FULL = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+
+type Stats = { week_hours: number; week_earnings: number; upcoming_shifts: number; needs_ack: number; active_clock: boolean };
 
 export default function Schedule() {
   const router = useRouter();
   const [view, setView] = useState<ViewMode>("week");
-
   const [weekAnchor, setWeekAnchor] = useState(() => startOfWeek(new Date()));
-  const [monthCursor, setMonthCursor] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  });
+  const [monthCursor, setMonthCursor] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const [selectedDay, setSelectedDay] = useState<Date | null>(() => startOfDay(new Date()));
-
   const [weekShifts, setWeekShifts] = useState<any[]>([]);
   const [monthShifts, setMonthShifts] = useState<any[]>([]);
   const [calShifts, setCalShifts] = useState<any[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const weekEnd = useMemo(() => addDays(weekAnchor, 7), [weekAnchor]);
-
   const calGrid = useMemo(() => {
     const first = monthCursor;
     const gridStart = startOfWeek(first);
@@ -76,10 +60,7 @@ export default function Schedule() {
     let cursor = gridStart;
     for (let w = 0; w < 6; w++) {
       const week: { date: Date; inMonth: boolean }[] = [];
-      for (let i = 0; i < 7; i++) {
-        week.push({ date: cursor, inMonth: cursor.getMonth() === first.getMonth() });
-        cursor = addDays(cursor, 1);
-      }
+      for (let i = 0; i < 7; i++) { week.push({ date: cursor, inMonth: cursor.getMonth() === first.getMonth() }); cursor = addDays(cursor, 1); }
       weeks.push(week);
       if (cursor.getMonth() !== first.getMonth() && w >= 3) break;
     }
@@ -89,6 +70,8 @@ export default function Schedule() {
   const load = useCallback(async () => {
     setFetching(true);
     try {
+      const [statsData] = await Promise.all([api("/schedule/stats")]);
+      setStats(statsData);
       if (view === "week") {
         const d = await api(`/schedule?start=${weekAnchor.toISOString()}&end=${weekEnd.toISOString()}`);
         setWeekShifts(d.shifts || []);
@@ -106,27 +89,23 @@ export default function Schedule() {
     setInitialLoading(false);
   }, [view, weekAnchor, weekEnd, calGrid]);
 
-  // Data for the newly selected view/week/month is fetched in the background
-  // (see `fetching`) so switching tabs or navigating dates never blanks the
-  // screen — the previous content stays visible until fresh data lands.
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
+  const jumpToToday = () => {
+    tap();
+    const today = new Date();
+    setWeekAnchor(startOfWeek(today));
+    setSelectedDay(startOfDay(today));
   };
 
   const groupByDay = (shifts: any[]) => {
     const map = new Map<string, any[]>();
-    shifts
-      .slice()
-      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-      .forEach((s) => {
-        const k = dateKey(new Date(s.start));
-        if (!map.has(k)) map.set(k, []);
-        map.get(k)!.push(s);
-      });
+    shifts.slice().sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()).forEach((s) => {
+      const k = dateKey(new Date(s.start));
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(s);
+    });
     return map;
   };
 
@@ -136,9 +115,7 @@ export default function Schedule() {
   const calDaysWithShifts = useMemo(() => new Set(calShifts.map((s) => dateKey(new Date(s.start)))), [calShifts]);
   const selectedDayShifts = useMemo(() => {
     if (!selectedDay) return [];
-    return calShifts
-      .filter((s) => isSameDay(new Date(s.start), selectedDay))
-      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    return calShifts.filter((s) => isSameDay(new Date(s.start), selectedDay)).sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
   }, [calShifts, selectedDay]);
 
   return (
@@ -146,21 +123,40 @@ export default function Schedule() {
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>Schedule</Text>
-          {fetching && !initialLoading && (
-            <ActivityIndicator size="small" color={light.textTertiary} style={styles.titleSpinner} />
-          )}
+          {fetching && !initialLoading && <ActivityIndicator size="small" color={light.textTertiary} style={styles.titleSpinner} />}
         </View>
+        {/* Stats bar */}
+        {stats && (
+          <View style={styles.statsRow}>
+            <View style={styles.statChip}>
+              <Text style={styles.statVal}>{stats.week_hours}h</Text>
+              <Text style={styles.statLbl}>this week</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statChip}>
+              <Text style={styles.statVal}>${stats.week_earnings.toFixed(0)}</Text>
+              <Text style={styles.statLbl}>est. pay</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statChip}>
+              <Text style={styles.statVal}>{stats.upcoming_shifts}</Text>
+              <Text style={styles.statLbl}>upcoming</Text>
+            </View>
+            {stats.needs_ack > 0 && (
+              <>
+                <View style={styles.statDivider} />
+                <View style={[styles.statChip, styles.statChipWarn]}>
+                  <Ionicons name="alert-circle" size={13} color={light.amber} />
+                  <Text style={[styles.statLbl, { color: light.amber, marginLeft: 3 }]}>{stats.needs_ack} unread</Text>
+                </View>
+              </>
+            )}
+          </View>
+        )}
         <View style={styles.segmented}>
-          {(["week", "month", "calendar"] as ViewMode[]).map((m) => (
-            <Pressable
-              key={m}
-              testID={`range-${m}`}
-              onPress={() => { tap(); setView(m); }}
-              style={[styles.segBtn, view === m && styles.segActive]}
-            >
-              <Text style={[styles.segText, view === m && styles.segTextActive]}>
-                {m === "week" ? "Week" : m === "month" ? "Month" : "Calendar"}
-              </Text>
+          {(["week","month","calendar"] as ViewMode[]).map((m) => (
+            <Pressable key={m} testID={`range-${m}`} onPress={() => { tap(); setView(m); }} style={[styles.segBtn, view === m && styles.segActive]}>
+              <Text style={[styles.segText, view === m && styles.segTextActive]}>{m === "week" ? "Week" : m === "month" ? "Month" : "Calendar"}</Text>
             </Pressable>
           ))}
         </View>
@@ -179,6 +175,9 @@ export default function Schedule() {
               <View style={styles.rangeRow}>
                 <Text style={styles.rangeText}>{fmtWeekRange(weekAnchor, weekEnd)}</Text>
                 <View style={styles.navBtns}>
+                  <Pressable testID="today-btn" style={styles.todayBtn} onPress={jumpToToday}>
+                    <Text style={styles.todayBtnText}>Today</Text>
+                  </Pressable>
                   <Pressable testID="week-prev" style={styles.navBtn} onPress={() => { tap(); setWeekAnchor(addDays(weekAnchor, -7)); }}>
                     <Ionicons name="chevron-back" size={18} color={light.text} />
                   </Pressable>
@@ -192,15 +191,11 @@ export default function Schedule() {
                 {weekDays.map((d) => {
                   const isSelected = selectedDay && isSameDay(d, selectedDay);
                   const hasShift = weekGrouped.has(dateKey(d));
+                  const isToday = isSameDay(d, new Date());
                   return (
-                    <Pressable
-                      key={d.toISOString()}
-                      testID={`week-day-${d.getDate()}`}
-                      style={styles.dayCell}
-                      onPress={() => { tap(); setSelectedDay(d); }}
-                    >
-                      <Text style={styles.dayDow}>{DOW_FULL[d.getDay()]}</Text>
-                      <View style={[styles.dayNumWrap, isSelected && styles.dayNumWrapActive]}>
+                    <Pressable key={d.toISOString()} testID={`week-day-${d.getDate()}`} style={styles.dayCell} onPress={() => { tap(); setSelectedDay(d); }}>
+                      <Text style={[styles.dayDow, isToday && styles.dayDowToday]}>{DOW_FULL[d.getDay()]}</Text>
+                      <View style={[styles.dayNumWrap, isSelected && styles.dayNumWrapActive, !isSelected && isToday && styles.dayNumWrapToday]}>
                         <Text style={[styles.dayNum, isSelected && styles.dayNumActive]}>{d.getDate()}</Text>
                       </View>
                       <View style={[styles.dayDot, hasShift ? styles.dayDotOn : styles.dayDotOff]} />
@@ -237,29 +232,15 @@ export default function Schedule() {
             <>
               <View style={styles.calCard} testID="calendar-card">
                 <View style={styles.calHeaderRow}>
-                  <Pressable
-                    testID="cal-prev"
-                    style={styles.calNavBtn}
-                    onPress={() => { tap(); setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1)); }}
-                  >
+                  <Pressable testID="cal-prev" style={styles.calNavBtn} onPress={() => { tap(); setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1)); }}>
                     <Ionicons name="chevron-back" size={18} color="#fff" />
                   </Pressable>
                   <Text style={styles.calMonthText}>{fmtMonthYear(monthCursor)}</Text>
-                  <Pressable
-                    testID="cal-next"
-                    style={styles.calNavBtn}
-                    onPress={() => { tap(); setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1)); }}
-                  >
+                  <Pressable testID="cal-next" style={styles.calNavBtn} onPress={() => { tap(); setMonthCursor(new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1)); }}>
                     <Ionicons name="chevron-forward" size={18} color="#fff" />
                   </Pressable>
                 </View>
-
-                <View style={styles.calDowRow}>
-                  {DOW.map((d, i) => (
-                    <Text key={i} style={styles.calDowText}>{d}</Text>
-                  ))}
-                </View>
-
+                <View style={styles.calDowRow}>{DOW.map((d, i) => <Text key={i} style={styles.calDowText}>{d}</Text>)}</View>
                 {calGrid.map((week, wi) => (
                   <View key={wi} style={styles.calWeekRow}>
                     {week.map(({ date, inMonth }) => {
@@ -267,25 +248,9 @@ export default function Schedule() {
                       const selected = selectedDay && isSameDay(date, selectedDay);
                       const hasShift = calDaysWithShifts.has(dateKey(date));
                       return (
-                        <Pressable
-                          key={date.toISOString()}
-                          testID={`cal-date-${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`}
-                          style={styles.calCell}
-                          onPress={() => { tap(); setSelectedDay(date); }}
-                          disabled={!inMonth}
-                        >
-                          <View style={[
-                            styles.calCellCircle,
-                            selected && styles.calCellCircleSelected,
-                            !selected && today && styles.calCellCircleToday,
-                          ]}>
-                            <Text style={[
-                              styles.calCellText,
-                              !inMonth && styles.calCellTextDim,
-                              selected && styles.calCellTextSelected,
-                            ]}>
-                              {date.getDate()}
-                            </Text>
+                        <Pressable key={date.toISOString()} testID={`cal-date-${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`} style={styles.calCell} onPress={() => { tap(); setSelectedDay(date); }} disabled={!inMonth}>
+                          <View style={[styles.calCellCircle, selected && styles.calCellCircleSelected, !selected && today && styles.calCellCircleToday]}>
+                            <Text style={[styles.calCellText, !inMonth && styles.calCellTextDim, selected && styles.calCellTextSelected]}>{date.getDate()}</Text>
                           </View>
                           <View style={[styles.calDot, hasShift && inMonth ? styles.calDotOn : styles.calDotOff]} />
                         </Pressable>
@@ -303,13 +268,7 @@ export default function Schedule() {
                   <Text style={styles.emptyDark}>No shifts scheduled</Text>
                 ) : (
                   selectedDayShifts.map((s, i) => (
-                    <ShiftRow
-                      key={s.id}
-                      shift={s}
-                      bordered={i < selectedDayShifts.length - 1}
-                      dark
-                      onPress={() => router.push({ pathname: "/shift/[id]", params: { id: s.id } })}
-                    />
+                    <ShiftRow key={s.id} shift={s} bordered={i < selectedDayShifts.length - 1} dark onPress={() => router.push({ pathname: "/shift/[id]", params: { id: s.id } })} />
                   ))
                 )}
               </AnimatedDayCard>
@@ -335,64 +294,58 @@ function DayGroup({ label, shifts, router }: { label: string; shifts: any[]; rou
 }
 
 function ShiftRow({ shift, bordered, onPress, dark }: { shift: any; bordered: boolean; onPress: () => void; dark?: boolean }) {
-  const status =
-    shift.status === "completed"
-      ? { icon: "checkmark" as const, bg: light.greenBg, fg: light.green }
-      : shift.instructions_acknowledged
-      ? { icon: "checkmark" as const, bg: dark ? "rgba(255,255,255,0.14)" : light.chip, fg: dark ? "rgba(255,255,255,0.7)" : light.textSecondary }
-      : { icon: "alert" as const, bg: light.amberBg, fg: light.amber };
+  const isCompleted = shift.status === "completed";
+  const needsAck = !shift.instructions_acknowledged && shift.status === "scheduled";
+  const accentColor = isCompleted ? "#22C55E" : needsAck ? "#F59E0B" : "#3B82F6";
+
   return (
-    <Pressable
-      testID={`shift-item-${shift.id}`}
-      onPress={onPress}
-      style={[styles.shiftRow, bordered && (dark ? styles.rowDividerDark : styles.rowDivider)]}
-    >
-      <View style={[styles.shiftIconWrap, dark && styles.shiftIconWrapDark]}>
-        <Ionicons name="business-outline" size={18} color={dark ? "#fff" : light.text} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.shiftTime, dark && styles.shiftTimeDark]}>{fmtShiftTime(shift.start)} {"\u2013"} {fmtShiftTime(shift.end)}</Text>
+    <Pressable testID={`shift-item-${shift.id}`} onPress={onPress} style={[styles.shiftRow, bordered && (dark ? styles.rowDividerDark : styles.rowDivider)]}>
+      <View style={[styles.shiftAccent, { backgroundColor: accentColor }]} />
+      <View style={{ flex: 1, paddingLeft: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Text style={[styles.shiftTime, dark && styles.shiftTimeDark]}>
+            {new Date(shift.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+            {" \u2013 "}
+            {new Date(shift.end).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+          </Text>
+          <View style={[styles.durationBadge, dark && styles.durationBadgeDark]}>
+            <Text style={[styles.durationText, dark && styles.durationTextDark]}>
+              {shiftDuration(shift.start, shift.end)}
+            </Text>
+          </View>
+        </View>
         <Text style={[styles.shiftSite, dark && styles.shiftSiteDark]}>{shift.site?.name}</Text>
-        <Text style={[styles.shiftRole, dark && styles.shiftRoleDark]}>{shift.role}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 }}>
+          <Text style={[styles.shiftRole, dark && styles.shiftRoleDark]}>{shift.role}</Text>
+          {shift.pay_rate && (
+            <Text style={[styles.shiftPay, dark && { color: "rgba(255,255,255,0.4)" }]}>
+              · {estEarnings(shift.start, shift.end, shift.pay_rate)} est.
+            </Text>
+          )}
+        </View>
       </View>
-      <View style={[styles.statusCircle, { backgroundColor: status.bg }]} testID={shift.status === "completed" ? `completed-${shift.id}` : undefined}>
-        <Ionicons name={status.icon === "checkmark" ? "checkmark" : "alert"} size={15} color={status.fg} />
+      <View style={[styles.statusDot, { backgroundColor: accentColor + "28" }]}>
+        <Ionicons
+          name={isCompleted ? "checkmark" : needsAck ? "alert" : "checkmark"}
+          size={14}
+          color={accentColor}
+        />
       </View>
     </Pressable>
   );
 }
 
-// Renders the selected day's shifts in a black card that "flows" in with a
-// spring pop + color settle whenever the selected date changes, for a
-// liquid, fluid feel rather than an abrupt swap.
 function AnimatedDayCard({ dayKey, children }: { dayKey: string; children: React.ReactNode }) {
   const anim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     anim.setValue(0);
-    Animated.spring(anim, {
-      toValue: 1,
-      useNativeDriver: false,
-      friction: 9,
-      tension: 90,
-    }).start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    Animated.spring(anim, { toValue: 1, useNativeDriver: false, friction: 9, tension: 90 }).start();
   }, [dayKey]);
-
-  const backgroundColor = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["#2C2C2E", light.black],
-  });
+  const backgroundColor = anim.interpolate({ inputRange: [0, 1], outputRange: ["#2C2C2E", light.black] });
   const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] });
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
-
   return (
-    <Animated.View
-      style={[
-        styles.calListCard,
-        { backgroundColor, opacity: anim, transform: [{ scale }, { translateY }] },
-      ]}
-    >
+    <Animated.View style={[styles.calListCard, { backgroundColor, opacity: anim, transform: [{ scale }, { translateY }] }]}>
       {children}
     </Animated.View>
   );
@@ -401,9 +354,16 @@ function AnimatedDayCard({ dayKey, children }: { dayKey: string; children: React
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: light.bg },
   header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14 },
-  titleRow: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
+  titleRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   title: { color: light.text, fontSize: 32, fontWeight: "800", letterSpacing: -0.5 },
   titleSpinner: { marginLeft: 10 },
+
+  statsRow: { flexDirection: "row", alignItems: "center", backgroundColor: light.card, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 14, borderWidth: 1, borderColor: light.cardBorder },
+  statChip: { flexDirection: "row", alignItems: "center", gap: 4 },
+  statChipWarn: {},
+  statVal: { color: light.text, fontSize: 14, fontWeight: "700" },
+  statLbl: { color: light.textTertiary, fontSize: 11 },
+  statDivider: { width: 1, height: 16, backgroundColor: light.cardBorder, marginHorizontal: 10 },
 
   segmented: { flexDirection: "row", backgroundColor: light.chip, borderRadius: 999, padding: 3 },
   segBtn: { flex: 1, paddingVertical: 9, alignItems: "center", borderRadius: 999 },
@@ -413,39 +373,44 @@ const styles = StyleSheet.create({
 
   rangeRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4, marginBottom: 16 },
   rangeText: { color: light.textSecondary, fontSize: 14, fontWeight: "500" },
-  navBtns: { flexDirection: "row", gap: 10 },
-  navBtn: {
-    width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: light.cardBorder,
-    alignItems: "center", justifyContent: "center", backgroundColor: "#fff",
-  },
+  navBtns: { flexDirection: "row", gap: 6, alignItems: "center" },
+  todayBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: light.chip },
+  todayBtnText: { color: light.text, fontSize: 12, fontWeight: "600" },
+  navBtn: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: light.cardBorder, alignItems: "center", justifyContent: "center", backgroundColor: "#fff" },
 
   dayStrip: { flexDirection: "row", justifyContent: "space-between", marginBottom: 22 },
   dayCell: { alignItems: "center", gap: 8, width: 36 },
   dayDow: { color: light.textTertiary, fontSize: 10, fontWeight: "600", letterSpacing: 0.3 },
+  dayDowToday: { color: light.text },
   dayNumWrap: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   dayNumWrapActive: { backgroundColor: light.black },
+  dayNumWrapToday: { borderWidth: 1.5, borderColor: light.text },
   dayNum: { color: light.text, fontSize: 15, fontWeight: "700" },
   dayNumActive: { color: "#fff" },
   dayDot: { width: 5, height: 5, borderRadius: 2.5 },
-  dayDotOn: { backgroundColor: light.text },
+  dayDotOn: { backgroundColor: "#3B82F6" },
   dayDotOff: { backgroundColor: "transparent" },
 
   dayGroup: { marginBottom: 22 },
   dayGroupLabel: { color: light.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 0.6, marginBottom: 8 },
-
   listCard: { backgroundColor: light.card, borderRadius: 16, borderWidth: 1, borderColor: light.cardBorder, overflow: "hidden" },
-  shiftRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
+
+  shiftRow: { flexDirection: "row", alignItems: "center", padding: 14, paddingLeft: 0 },
+  shiftAccent: { width: 3, alignSelf: "stretch", borderRadius: 2, marginRight: 0 },
   rowDivider: { borderBottomWidth: 1, borderBottomColor: light.cardBorder },
   rowDividerDark: { borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" },
-  shiftIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: light.chip, alignItems: "center", justifyContent: "center" },
-  shiftIconWrapDark: { backgroundColor: "rgba(255,255,255,0.1)" },
   shiftTime: { color: light.textSecondary, fontSize: 12.5, fontWeight: "500" },
   shiftTimeDark: { color: "rgba(255,255,255,0.55)" },
   shiftSite: { color: light.text, fontSize: 15.5, fontWeight: "700", marginTop: 2 },
   shiftSiteDark: { color: "#fff" },
   shiftRole: { color: light.textSecondary, fontSize: 12.5, marginTop: 1 },
-  shiftRoleDark: { color: "rgba(255,255,255,0.55)" },
-  statusCircle: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  shiftRoleDark: { color: "rgba(255,255,255,0.45)" },
+  shiftPay: { color: light.textTertiary, fontSize: 12, marginTop: 1 },
+  durationBadge: { backgroundColor: light.chip, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  durationBadgeDark: { backgroundColor: "rgba(255,255,255,0.12)" },
+  durationText: { color: light.textSecondary, fontSize: 11, fontWeight: "600" },
+  durationTextDark: { color: "rgba(255,255,255,0.5)" },
+  statusDot: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", marginLeft: 8, marginRight: 4 },
 
   empty: { color: light.textSecondary, textAlign: "center", marginTop: 60, fontSize: 15 },
   emptyDark: { color: "rgba(255,255,255,0.5)", textAlign: "center", paddingVertical: 28, fontSize: 14 },
@@ -465,9 +430,8 @@ const styles = StyleSheet.create({
   calCellTextDim: { color: "rgba(255,255,255,0.25)" },
   calCellTextSelected: { color: light.black },
   calDot: { width: 4, height: 4, borderRadius: 2 },
-  calDotOn: { backgroundColor: "#4ADE80" },
+  calDotOn: { backgroundColor: "#3B82F6" },
   calDotOff: { backgroundColor: "transparent" },
-
   calListLabel: { color: light.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 0.6, marginTop: 20, marginBottom: 8 },
   calListCard: { borderRadius: 16, overflow: "hidden" },
 });
