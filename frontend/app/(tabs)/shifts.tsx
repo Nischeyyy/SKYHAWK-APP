@@ -3,11 +3,40 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Refre
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { theme } from "@/src/theme";
-import { StatusPill } from "@/src/ui";
 import { api } from "@/src/api/client";
-import { formatShiftTime, formatDate, formatCurrency, hoursBetween } from "@/src/utils/format";
+import { formatShiftTime, formatDate, hoursBetween } from "@/src/utils/format";
 import { success as hapticSuccess, impact as hapticImpact } from "@/src/utils/haptics";
+
+// ─── Light palette (matches Profile / Community / Wallet) ──────────────────
+const C = {
+  bg: "#F2F2F7",
+  card: "#FFFFFF",
+  border: "#E5E5EA",
+  divider: "#E5E5EA",
+  text: "#0B0B0C",
+  textSecondary: "#6C6C70",
+  textTertiary: "#AEAEB2",
+  accent: "#0A84FF",
+  accentSoft: "rgba(10,132,255,0.12)",
+  warning: "#C77700",
+  warningSoft: "rgba(199,119,0,0.12)",
+  verified: "#2FAE59",
+  bannerBg: "#E8F1FF",
+};
+
+function Badge({ label, tone }: { label: string; tone: "accent" | "warning" }) {
+  const isAccent = tone === "accent";
+  return (
+    <View style={[styles.badge, { backgroundColor: isAccent ? C.accentSoft : C.warningSoft }]}>
+      {isAccent ? (
+        <Ionicons name="star" size={11} color={C.accent} />
+      ) : (
+        <Ionicons name="flash" size={11} color={C.warning} />
+      )}
+      <Text style={[styles.badgeText, { color: isAccent ? C.accent : C.warning }]}>{label}</Text>
+    </View>
+  );
+}
 
 export default function OpenShifts() {
   const [data, setData] = useState<any>(null);
@@ -67,15 +96,20 @@ export default function OpenShifts() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Open Shifts</Text>
-        <Text style={styles.subtitle}>{shifts.length} available</Text>
+        <View>
+          <Text style={styles.title}>Open Shifts</Text>
+          <Text style={styles.subtitle}>{shifts.length} available</Text>
+        </View>
+        <Pressable testID="filter-btn" hitSlop={10} style={styles.filterBtn}>
+          <Ionicons name="filter" size={18} color={C.text} />
+        </Pressable>
       </View>
       {loading ? (
-        <ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={C.textSecondary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={theme.colors.textSecondary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={C.textSecondary} />}
           showsVerticalScrollIndicator={false}
         >
           {shifts.length === 0 && <Text style={styles.empty}>No open shifts</Text>}
@@ -86,35 +120,31 @@ export default function OpenShifts() {
             const waitlisted = s.on_waitlist;
             const isTopPick = idx === 0 && !claimed && !waitlisted; // Filled button only for #1
             return (
-              <View
-                key={s.id}
-                testID={`open-shift-${s.id}`}
-                style={[styles.item, idx < shifts.length - 1 && styles.itemBorder]}
-              >
+              <View key={s.id} testID={`open-shift-${s.id}`} style={styles.card}>
                 <View style={styles.itemHeader}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1, flexWrap: "wrap" }}>
                     <Text style={styles.itemDate}>{formatDate(s.start)}</Text>
-                    {isTopPick && <StatusPill label="Top Pick" tone="accent" />}
-                    {s.urgent && <StatusPill label="Urgent" tone="warning" />}
+                    {isTopPick && <Badge label="Top Pick" tone="accent" />}
+                    {s.urgent && <Badge label="Urgent" tone="warning" />}
                   </View>
-                  <Text style={styles.itemPay}>{formatCurrency(s.pay_rate)}<Text style={styles.perHr}>/hr</Text></Text>
+                  <Ionicons name="chevron-forward" size={18} color={C.textTertiary} />
                 </View>
                 <Text style={styles.itemTime}>{formatShiftTime(s.start)} – {formatShiftTime(s.end)}</Text>
                 <View style={styles.metaRow}>
-                  <Ionicons name="business-outline" size={13} color={theme.colors.textSecondary} />
+                  <Ionicons name="business-outline" size={14} color={C.textSecondary} />
                   <Text style={styles.itemSite}>{s.site?.name}</Text>
                 </View>
                 <View style={styles.metaRow}>
-                  <Ionicons name="shield-outline" size={13} color={theme.colors.textSecondary} />
+                  <Ionicons name="shield-outline" size={14} color={C.textSecondary} />
                   <Text style={styles.itemMeta}>{s.role} · {hrs}h · {spotsLeft} spot{spotsLeft !== 1 ? "s" : ""}</Text>
                 </View>
 
                 <View style={{ marginTop: 14 }}>
                   {claiming === s.id ? (
-                    <ActivityIndicator color={theme.colors.accent} size="small" />
+                    <ActivityIndicator color={C.accent} size="small" />
                   ) : claimed ? (
                     <Pressable testID={`cancel-claim-${s.id}`} onPress={() => cancel(s.id)} style={styles.claimedBtn}>
-                      <Ionicons name="checkmark-circle" size={16} color={theme.colors.verified} />
+                      <Ionicons name="checkmark-circle" size={16} color={C.verified} />
                       <Text style={styles.claimedText}>Claimed · Tap to Cancel</Text>
                     </Pressable>
                   ) : waitlisted ? (
@@ -129,13 +159,28 @@ export default function OpenShifts() {
                   ) : (
                     <Pressable testID={`claim-${s.id}`} onPress={() => claim(s.id)} style={styles.linkBtn}>
                       <Text style={styles.linkText}>{spotsLeft > 0 ? "Claim" : "Join Waitlist"}</Text>
-                      <Ionicons name="arrow-forward" size={14} color={theme.colors.accent} />
+                      <Ionicons name="arrow-forward" size={14} color={C.accent} />
                     </Pressable>
                   )}
                 </View>
               </View>
             );
           })}
+
+          {shifts.length > 0 && (
+            <View style={styles.banner} testID="alerts-banner">
+              <View style={styles.bannerIcon}>
+                <Ionicons name="calendar" size={16} color={C.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bannerTitle}>New shifts are posted daily</Text>
+                <Text style={styles.bannerSub}>Check back often to grab the best opportunities.</Text>
+              </View>
+              <Pressable testID="turn-on-alerts" hitSlop={8}>
+                <Text style={styles.bannerLink}>Turn on alerts</Text>
+              </Pressable>
+            </View>
+          )}
         </ScrollView>
       )}
       {toast && (
@@ -148,24 +193,34 @@ export default function OpenShifts() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
-  header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 12 },
-  title: { color: theme.colors.text, fontSize: 32, fontWeight: "700", letterSpacing: -0.5 },
-  subtitle: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 4 },
-  item: { paddingVertical: 18 },
-  itemBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
-  itemHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
-  itemDate: { color: theme.colors.textSecondary, fontSize: 13, textTransform: "uppercase", letterSpacing: 0.6 },
-  itemPay: { color: theme.colors.text, fontSize: 20, fontWeight: "600" },
-  perHr: { fontSize: 12, color: theme.colors.textSecondary, fontWeight: "400" },
-  itemTime: { color: theme.colors.text, fontSize: 18, fontWeight: "500", marginTop: 6 },
-  itemSite: { color: theme.colors.text, fontSize: 15, marginLeft: 4 },
-  itemMeta: { color: theme.colors.textSecondary, fontSize: 13, marginLeft: 4 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
+  safe: { flex: 1, backgroundColor: C.bg },
+  header: {
+    flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between",
+    paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16,
+  },
+  title: { color: C.text, fontSize: 32, fontWeight: "700", letterSpacing: -0.5 },
+  subtitle: { color: C.textSecondary, fontSize: 14, marginTop: 4 },
+  filterBtn: {
+    width: 38, height: 38, borderRadius: 19, backgroundColor: C.card,
+    alignItems: "center", justifyContent: "center", marginTop: 2,
+    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 1 },
+  },
+  card: {
+    backgroundColor: C.card, borderRadius: 18, padding: 18, marginBottom: 14,
+    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+  },
+  itemHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  itemDate: { color: C.textSecondary, fontSize: 13, fontWeight: "500" },
+  badge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  badgeText: { fontSize: 11, fontWeight: "700" },
+  itemTime: { color: C.text, fontSize: 19, fontWeight: "700", marginTop: 10 },
+  itemSite: { color: C.text, fontSize: 15, marginLeft: 4, fontWeight: "500" },
+  itemMeta: { color: C.textSecondary, fontSize: 13, marginLeft: 4 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 7 },
   primaryBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: theme.radius.md,
-    paddingVertical: 13,
+    backgroundColor: C.accent,
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -173,26 +228,33 @@ const styles = StyleSheet.create({
   },
   primaryText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   outlineBtn: {
-    borderColor: theme.colors.border,
+    borderColor: C.border,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: theme.radius.md,
+    borderRadius: 14,
     paddingVertical: 12,
     alignItems: "center",
   },
-  outlineText: { color: theme.colors.text, fontSize: 14 },
+  outlineText: { color: C.text, fontSize: 14 },
   linkBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
-  linkText: { color: theme.colors.accent, fontSize: 14, fontWeight: "500" },
+  linkText: { color: C.accent, fontSize: 14, fontWeight: "600" },
   claimedBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8 },
-  claimedText: { color: theme.colors.textSecondary, fontSize: 13 },
-  claimBtn: { backgroundColor: theme.colors.text, borderRadius: theme.radius.md, paddingVertical: 12, alignItems: "center" },
-  claimText: { color: theme.colors.bg, fontSize: 15, fontWeight: "600" },
-  actionBtn: { borderColor: theme.colors.border, borderWidth: 1, borderRadius: theme.radius.md, paddingVertical: 12, alignItems: "center" },
-  actionText: { color: theme.colors.text, fontSize: 14 },
-  empty: { color: theme.colors.textSecondary, textAlign: "center", marginTop: 60, fontSize: 15 },
+  claimedText: { color: C.textSecondary, fontSize: 13 },
+  empty: { color: C.textSecondary, textAlign: "center", marginTop: 60, fontSize: 15 },
+  banner: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: C.bannerBg, borderRadius: 16, padding: 16, marginTop: 4, marginBottom: 12,
+  },
+  bannerIcon: {
+    width: 32, height: 32, borderRadius: 16, backgroundColor: "#FFFFFF",
+    alignItems: "center", justifyContent: "center",
+  },
+  bannerTitle: { color: C.text, fontSize: 13.5, fontWeight: "600" },
+  bannerSub: { color: C.textSecondary, fontSize: 12, marginTop: 2, lineHeight: 16 },
+  bannerLink: { color: C.accent, fontSize: 12.5, fontWeight: "600" },
   toast: {
     position: "absolute", bottom: 90, left: 20, right: 20,
-    backgroundColor: theme.colors.card, padding: 14, borderRadius: theme.radius.md,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border,
+    backgroundColor: C.card, padding: 14, borderRadius: 14,
+    shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
   },
-  toastText: { color: theme.colors.text, textAlign: "center", fontSize: 14 },
+  toastText: { color: C.text, textAlign: "center", fontSize: 14 },
 });
