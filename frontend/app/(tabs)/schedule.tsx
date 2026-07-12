@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl, Animated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -287,15 +287,21 @@ export default function Schedule() {
               <Text style={styles.calListLabel}>
                 {selectedDay ? selectedDay.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }).toUpperCase() : "SELECT A DATE"}
               </Text>
-              {selectedDayShifts.length === 0 ? (
-                <Text style={styles.empty}>No shifts scheduled</Text>
-              ) : (
-                <View style={styles.listCard}>
-                  {selectedDayShifts.map((s, i) => (
-                    <ShiftRow key={s.id} shift={s} bordered={i < selectedDayShifts.length - 1} onPress={() => router.push({ pathname: "/shift/[id]", params: { id: s.id } })} />
-                  ))}
-                </View>
-              )}
+              <AnimatedDayCard dayKey={selectedDay ? dateKey(selectedDay) : "none"}>
+                {selectedDayShifts.length === 0 ? (
+                  <Text style={styles.emptyDark}>No shifts scheduled</Text>
+                ) : (
+                  selectedDayShifts.map((s, i) => (
+                    <ShiftRow
+                      key={s.id}
+                      shift={s}
+                      bordered={i < selectedDayShifts.length - 1}
+                      dark
+                      onPress={() => router.push({ pathname: "/shift/[id]", params: { id: s.id } })}
+                    />
+                  ))
+                )}
+              </AnimatedDayCard>
             </>
           )}
         </ScrollView>
@@ -317,27 +323,67 @@ function DayGroup({ label, shifts, router }: { label: string; shifts: any[]; rou
   );
 }
 
-function ShiftRow({ shift, bordered, onPress }: { shift: any; bordered: boolean; onPress: () => void }) {
+function ShiftRow({ shift, bordered, onPress, dark }: { shift: any; bordered: boolean; onPress: () => void; dark?: boolean }) {
   const status =
     shift.status === "completed"
       ? { icon: "checkmark" as const, bg: light.greenBg, fg: light.green }
       : shift.instructions_acknowledged
-      ? { icon: "checkmark" as const, bg: light.chip, fg: light.textSecondary }
+      ? { icon: "checkmark" as const, bg: dark ? "rgba(255,255,255,0.14)" : light.chip, fg: dark ? "rgba(255,255,255,0.7)" : light.textSecondary }
       : { icon: "alert" as const, bg: light.amberBg, fg: light.amber };
   return (
-    <Pressable testID={`shift-item-${shift.id}`} onPress={onPress} style={[styles.shiftRow, bordered && styles.rowDivider]}>
-      <View style={styles.shiftIconWrap}>
-        <Ionicons name="business-outline" size={18} color={light.text} />
+    <Pressable
+      testID={`shift-item-${shift.id}`}
+      onPress={onPress}
+      style={[styles.shiftRow, bordered && (dark ? styles.rowDividerDark : styles.rowDivider)]}
+    >
+      <View style={[styles.shiftIconWrap, dark && styles.shiftIconWrapDark]}>
+        <Ionicons name="business-outline" size={18} color={dark ? "#fff" : light.text} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.shiftTime}>{fmtShiftTime(shift.start)} {"\u2013"} {fmtShiftTime(shift.end)}</Text>
-        <Text style={styles.shiftSite}>{shift.site?.name}</Text>
-        <Text style={styles.shiftRole}>{shift.role}</Text>
+        <Text style={[styles.shiftTime, dark && styles.shiftTimeDark]}>{fmtShiftTime(shift.start)} {"\u2013"} {fmtShiftTime(shift.end)}</Text>
+        <Text style={[styles.shiftSite, dark && styles.shiftSiteDark]}>{shift.site?.name}</Text>
+        <Text style={[styles.shiftRole, dark && styles.shiftRoleDark]}>{shift.role}</Text>
       </View>
       <View style={[styles.statusCircle, { backgroundColor: status.bg }]} testID={shift.status === "completed" ? `completed-${shift.id}` : undefined}>
         <Ionicons name={status.icon === "checkmark" ? "checkmark" : "alert"} size={15} color={status.fg} />
       </View>
     </Pressable>
+  );
+}
+
+// Renders the selected day's shifts in a black card that "flows" in with a
+// spring pop + color settle whenever the selected date changes, for a
+// liquid, fluid feel rather than an abrupt swap.
+function AnimatedDayCard({ dayKey, children }: { dayKey: string; children: React.ReactNode }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    anim.setValue(0);
+    Animated.spring(anim, {
+      toValue: 1,
+      useNativeDriver: false,
+      friction: 9,
+      tension: 90,
+    }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayKey]);
+
+  const backgroundColor = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#2C2C2E", light.black],
+  });
+  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] });
+  const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
+
+  return (
+    <Animated.View
+      style={[
+        styles.calListCard,
+        { backgroundColor, opacity: anim, transform: [{ scale }, { translateY }] },
+      ]}
+    >
+      {children}
+    </Animated.View>
   );
 }
 
@@ -377,13 +423,19 @@ const styles = StyleSheet.create({
   listCard: { backgroundColor: light.card, borderRadius: 16, borderWidth: 1, borderColor: light.cardBorder, overflow: "hidden" },
   shiftRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
   rowDivider: { borderBottomWidth: 1, borderBottomColor: light.cardBorder },
+  rowDividerDark: { borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.1)" },
   shiftIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: light.chip, alignItems: "center", justifyContent: "center" },
+  shiftIconWrapDark: { backgroundColor: "rgba(255,255,255,0.1)" },
   shiftTime: { color: light.textSecondary, fontSize: 12.5, fontWeight: "500" },
+  shiftTimeDark: { color: "rgba(255,255,255,0.55)" },
   shiftSite: { color: light.text, fontSize: 15.5, fontWeight: "700", marginTop: 2 },
+  shiftSiteDark: { color: "#fff" },
   shiftRole: { color: light.textSecondary, fontSize: 12.5, marginTop: 1 },
+  shiftRoleDark: { color: "rgba(255,255,255,0.55)" },
   statusCircle: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
 
   empty: { color: light.textSecondary, textAlign: "center", marginTop: 60, fontSize: 15 },
+  emptyDark: { color: "rgba(255,255,255,0.5)", textAlign: "center", paddingVertical: 28, fontSize: 14 },
 
   calCard: { backgroundColor: light.black, borderRadius: 20, padding: 16, marginTop: 6 },
   calHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
@@ -404,4 +456,5 @@ const styles = StyleSheet.create({
   calDotOff: { backgroundColor: "transparent" },
 
   calListLabel: { color: light.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 0.6, marginTop: 20, marginBottom: 8 },
+  calListCard: { borderRadius: 16, overflow: "hidden" },
 });
