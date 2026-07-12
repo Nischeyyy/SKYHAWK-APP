@@ -1,15 +1,25 @@
 import React, { useCallback, useState, useRef, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator, Animated, Linking, Modal } from "react-native";
+import { View, Text, StyleSheet, ScrollView, RefreshControl, Pressable, ActivityIndicator, Animated, Linking, Modal, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-import { theme } from "@/src/theme";
-import { Button, StatusPill, ShieldMark } from "@/src/ui";
+import { Avatar } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
-import { formatShiftTime, formatDate } from "@/src/utils/format";
 import { tap, warn as hapticWarn } from "@/src/utils/haptics";
+
+const light = {
+  bg: "#FFFFFF",
+  card: "#FFFFFF",
+  cardBorder: "#ECECEE",
+  chip: "#F5F5F7",
+  text: "#0B0B0C",
+  textSecondary: "#8A8A8E",
+  textTertiary: "#B0B0B4",
+  accentRed: "#E13B3B",
+  black: "#111112",
+};
 
 function greetingLabel() {
   const h = new Date().getHours();
@@ -18,37 +28,48 @@ function greetingLabel() {
   return "Good Evening";
 }
 
-function liveShiftStatus(shift: any, activeClock: any): { label: string; tone: "neutral" | "verified" | "warning" | "accent" } | null {
-  if (!shift) return null;
-  if (activeClock) return { label: "Clocked in", tone: "verified" };
-  const now = Date.now();
-  const start = new Date(shift.start).getTime();
-  const end = new Date(shift.end).getTime();
-  if (now > end) return { label: "Ended", tone: "neutral" };
-  if (now >= start) return { label: "In progress · Not clocked in", tone: "warning" };
-  const diffMin = Math.round((start - now) / 60000);
-  if (diffMin <= 15) return { label: `Starts in ${diffMin}m · Clock in available`, tone: "accent" };
-  if (diffMin < 60) return { label: `Starts in ${diffMin}m`, tone: "accent" };
-  const hrs = Math.floor(diffMin / 60);
-  const mm = diffMin % 60;
-  return { label: mm > 0 ? `Starts in ${hrs}h ${mm}m` : `Starts in ${hrs}h`, tone: "accent" };
+function shiftTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).replace(" ", " ");
+}
+
+function monthAbbrev(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+}
+
+function dayNumber(iso: string): string {
+  return String(new Date(iso).getDate());
 }
 
 export default function Dashboard() {
   const { user } = useAuth();
   const router = useRouter();
   const [data, setData] = useState<any>(null);
+  const [upcomingShifts, setUpcomingShifts] = useState<any[]>([]);
+  const [credential, setCredential] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sosOpen, setSosOpen] = useState(false);
   const [sosSubmitting, setSosSubmitting] = useState(false);
-  const [now, setNow] = useState(Date.now());
   const fade = useRef(new Animated.Value(0)).current;
 
   const load = useCallback(async () => {
     try {
-      const d = await api("/dashboard");
-      setData(d);
+      const [dash, schedule, wallet] = await Promise.all([
+        api("/dashboard"),
+        api("/schedule?range=month"),
+        api("/wallet"),
+      ]);
+      setData(dash);
+      const now = Date.now();
+      const upcoming = (schedule.shifts || [])
+        .filter((s: any) => new Date(s.start).getTime() > now && s.id !== dash?.today_shift?.id)
+        .sort((a: any, b: any) => new Date(a.start).getTime() - new Date(b.start).getTime())
+        .slice(0, 3);
+      setUpcomingShifts(upcoming);
+      const primaryCredential =
+        (wallet.documents || []).find((d: any) => d.type === "security_licence") || (wallet.documents || [])[0] || null;
+      setCredential(primaryCredential);
     } catch {}
     setLoading(false);
   }, []);
@@ -57,11 +78,6 @@ export default function Dashboard() {
   useEffect(() => {
     if (!loading) Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
   }, [loading, fade]);
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30000);
-    return () => clearInterval(t);
-  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -72,21 +88,15 @@ export default function Dashboard() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
-        <ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 60 }} />
+        <ActivityIndicator color={light.textSecondary} style={{ marginTop: 60 }} />
       </SafeAreaView>
     );
   }
 
   const today = data?.today_shift;
-  const next = data?.next_shift;
   const activeClock = data?.active_clock;
-  const firstName = user?.full_name.split(" ")[0];
+  const firstName = user?.full_name?.split(" ")[0];
   const dispatchNumber = "+14165550000";
-  const shiftStatus = liveShiftStatus(today, activeClock);
-  // Compute clock-in availability (15 min before start)
-  const canClockIn = today
-    ? now >= new Date(today.start).getTime() - 15 * 60 * 1000 && now <= new Date(today.end).getTime()
-    : false;
 
   const triggerSos = async () => {
     setSosSubmitting(true);
@@ -124,119 +134,189 @@ export default function Dashboard() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView
         contentContainerStyle={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.textSecondary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={light.textSecondary} />}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={{ opacity: fade }}>
-          {/* Greet header */}
-          <View style={styles.greetHeader}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
-              <ShieldMark size={16} />
-              <Text style={styles.greetText}>{greetingLabel()}</Text>
+          {/* Brand header */}
+          <View style={styles.brandHeader}>
+            <View style={styles.brandLeft}>
+              <Image source={require("@/assets/images/skyhawk-logo.png")} style={styles.brandLogo} resizeMode="contain" />
+              <View>
+                <Text style={styles.brandTitle}>SKYHAWK</Text>
+                <Text style={styles.brandSub}>SECURITY SERVICES</Text>
+              </View>
             </View>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <Text style={styles.nameText}>{firstName}</Text>
-              {data?.unread_announcements > 0 && (
-                <Pressable
-                  testID="announcements-btn"
-                  onPress={() => { tap(); router.push("/announcements"); }}
-                  hitSlop={12}
-                  style={styles.notifBtn}
-                >
-                  <View style={styles.dot} />
-                </Pressable>
-              )}
+            <View style={styles.brandRight}>
+              <Pressable
+                testID="announcements-btn"
+                onPress={() => { tap(); router.push("/announcements"); }}
+                hitSlop={10}
+                style={styles.bellBtn}
+              >
+                <Ionicons name="notifications-outline" size={20} color={light.text} />
+                {data?.unread_announcements > 0 && <View style={styles.bellDot} />}
+              </Pressable>
+              <Pressable testID="profile-avatar-btn" onPress={() => { tap(); router.push("/(tabs)/profile"); }}>
+                <Avatar name={user?.full_name} size={40} />
+              </Pressable>
             </View>
           </View>
 
-          {/* Today's Shift */}
-          {today ? (
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionLabel}>Today{"\u2019"}s Shift</Text>
-                {shiftStatus && <StatusPill label={shiftStatus.label} tone={shiftStatus.tone} testID="shift-status-pill" />}
-              </View>
-              <Text style={styles.timeRange}>
-                {formatShiftTime(today.start)} – {formatShiftTime(today.end)}
-              </Text>
-              <View style={styles.metaRow}>
-                <Ionicons name="business-outline" size={14} color={theme.colors.textSecondary} />
-                <Text style={styles.metaText}>{today.site?.name}</Text>
-              </View>
-              <View style={styles.metaRow}>
-                <Ionicons name="shield-checkmark-outline" size={14} color={theme.colors.textSecondary} />
-                <Text style={styles.metaSubtext}>{today.role}</Text>
-              </View>
+          {/* Greeting */}
+          <View style={styles.greetWrap}>
+            <Text style={styles.greetText}>{greetingLabel()}</Text>
+            <Text style={styles.nameText}>{firstName}</Text>
+          </View>
 
-              <View style={styles.cta}>
-                {activeClock ? (
-                  <Button
-                    testID="clock-out-btn"
-                    label="Clocked In · Tap to Manage"
-                    variant="secondary"
-                    onPress={() => router.push("/timeclock")}
-                    leading={<Ionicons name="checkmark-circle" size={16} color={theme.colors.verified} />}
-                  />
-                ) : (
-                  <Button
-                    testID="clock-in-btn"
-                    label={canClockIn ? "Clock In" : "Clock In (Available soon)"}
-                    disabled={!canClockIn}
-                    onPress={() => router.push({ pathname: "/timeclock", params: { shift_id: today.id } })}
-                  />
-                )}
-              </View>
-            </View>
+          {/* Today's Assignment */}
+          <Text style={styles.sectionLabel}>TODAY{"\u2019"}S ASSIGNMENT</Text>
+          {today ? (
+            <>
+              <Pressable
+                testID="today-assignment-card"
+                onPress={() => router.push({ pathname: "/shift/[id]", params: { id: today.id } })}
+                style={styles.assignCard}
+              >
+                <View style={styles.assignIconWrap}>
+                  <Ionicons name="business-outline" size={22} color={light.text} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.assignSite}>{today.site?.name}</Text>
+                  <Text style={styles.assignRole}>{today.role}</Text>
+                  <View style={styles.assignTimeRow}>
+                    <Ionicons name="time-outline" size={13} color={light.textSecondary} />
+                    <Text style={styles.assignTime}>{shiftTime(today.start)} – {shiftTime(today.end)}</Text>
+                  </View>
+                </View>
+                <View style={styles.assignRightCol}>
+                  <View style={styles.upcomingPill}>
+                    <View style={styles.upcomingDot} />
+                    <Text style={styles.upcomingPillText}>Upcoming</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={light.textTertiary} style={{ marginTop: 14 }} />
+                </View>
+              </Pressable>
+
+              <Pressable
+                testID={activeClock ? "clock-out-btn" : "clock-in-btn"}
+                onPress={() => router.push({ pathname: "/timeclock", params: { shift_id: today.id } })}
+                style={styles.clockInBtn}
+              >
+                <Ionicons name="scan-outline" size={20} color="#fff" />
+                <Text style={styles.clockInText}>{activeClock ? "Clocked In · Manage" : "Clock In"}</Text>
+              </Pressable>
+            </>
           ) : (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Today{"\u2019"}s Shift</Text>
-              <Text style={styles.emptyTitle}>No shift scheduled</Text>
-              <Text style={styles.emptyBody}>Browse the marketplace to pick up open shifts.</Text>
-              <View style={styles.cta}>
-                <Button testID="browse-shifts-btn" label="Browse Open Shifts" variant="secondary" onPress={() => router.push("/(tabs)/shifts")} />
+            <View style={styles.assignCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.assignSite}>No shift scheduled</Text>
+                <Text style={styles.assignRole}>Browse the marketplace to pick up open shifts.</Text>
               </View>
+              <Pressable testID="browse-shifts-btn" onPress={() => router.push("/(tabs)/shifts")}>
+                <Ionicons name="chevron-forward" size={18} color={light.textTertiary} />
+              </Pressable>
             </View>
           )}
 
           {/* Quick actions */}
           <View style={styles.actionsRow}>
-            <ActionButton
+            <QuickAction
               testID="sos-btn"
-              label="SOS"
+              label="Emergency"
+              sub="Need immediate help"
               danger
               onPress={() => { tap(); setSosOpen(true); }}
-              icon={<Text style={styles.sosText}>SOS</Text>}
+              icon={<Ionicons name="shield-outline" size={24} color={light.accentRed} />}
             />
-            <ActionButton
+            <QuickAction
               testID="call-dispatch-btn"
               label="Dispatch"
+              sub="Call dispatch"
               onPress={() => { tap(); Linking.openURL(`tel:${dispatchNumber}`); }}
-              icon={<Ionicons name="call" size={24} color={theme.colors.accent} />}
+              icon={<Ionicons name="radio-outline" size={24} color={light.text} />}
             />
-            <ActionButton
+            <QuickAction
               testID="create-report-btn"
               label="Report"
+              sub="Submit a report"
               onPress={() => { tap(); router.push("/incidents"); }}
-              icon={<Ionicons name="document-text" size={24} color={theme.colors.accent} />}
+              icon={<Ionicons name="document-text-outline" size={24} color={light.text} />}
             />
           </View>
 
-          {/* Upcoming */}
-          {next && (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Upcoming</Text>
-              <Pressable
-                testID="next-shift-tap"
-                onPress={() => router.push({ pathname: "/shift/[id]", params: { id: next.id } })}
-              >
-                <Text style={styles.upcomingSite}>{next.site?.name}</Text>
-                <View style={styles.metaRow}>
-                  <Ionicons name="calendar-outline" size={13} color={theme.colors.textSecondary} />
-                  <Text style={styles.upcomingMeta}>{formatDate(next.start)} · {formatShiftTime(next.start)} – {formatShiftTime(next.end)}</Text>
-                </View>
-              </Pressable>
+          {/* Upcoming Shifts */}
+          {upcomingShifts.length > 0 && (
+            <View style={styles.block}>
+              <View style={styles.blockHeader}>
+                <Text style={styles.sectionLabel}>UPCOMING SHIFTS</Text>
+                <Pressable testID="view-schedule-link" onPress={() => { tap(); router.push("/(tabs)/schedule"); }} style={styles.rowLink}>
+                  <Text style={styles.linkText}>View Schedule</Text>
+                  <Ionicons name="chevron-forward" size={14} color={light.textSecondary} />
+                </Pressable>
+              </View>
+              <View style={styles.listCard}>
+                {upcomingShifts.map((s, i) => (
+                  <Pressable
+                    key={s.id}
+                    testID={`upcoming-shift-${i}`}
+                    onPress={() => router.push({ pathname: "/shift/[id]", params: { id: s.id } })}
+                    style={[styles.shiftRow, i < upcomingShifts.length - 1 && styles.rowDivider]}
+                  >
+                    <View style={styles.dateBadge}>
+                      <Text style={styles.dateBadgeMonth}>{monthAbbrev(s.start)}</Text>
+                      <Text style={styles.dateBadgeDay}>{dayNumber(s.start)}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.shiftSite}>{s.site?.name}</Text>
+                      <Text style={styles.shiftRole}>{s.role}</Text>
+                      <Text style={styles.shiftTime}>{shiftTime(s.start)} – {shiftTime(s.end)}</Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <View style={styles.scheduledPill}>
+                        <Text style={styles.scheduledPillText}>Scheduled</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={light.textTertiary} style={{ marginTop: 10 }} />
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           )}
+
+          {/* Credentials */}
+          <View style={styles.block}>
+            <View style={styles.blockHeader}>
+              <Text style={styles.sectionLabel}>CREDENTIALS</Text>
+              <Pressable testID="view-credentials-link" onPress={() => { tap(); router.push("/(tabs)/wallet"); }} style={styles.rowLink}>
+                <Text style={styles.linkText}>View All</Text>
+                <Ionicons name="chevron-forward" size={14} color={light.textSecondary} />
+              </Pressable>
+            </View>
+            {credential ? (
+              <Pressable testID="credential-card" onPress={() => { tap(); router.push("/(tabs)/wallet"); }} style={styles.listCard}>
+                <View style={styles.credRow}>
+                  <View style={styles.credIconWrap}>
+                    <Ionicons name="shield-checkmark-outline" size={20} color={light.text} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.credName}>{credential.name}</Text>
+                    <Text style={styles.credNumber}>{credential.number}</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={styles.credExpiry}>
+                      Expires {new Date(credential.expiry).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={light.textTertiary} style={{ marginTop: 10 }} />
+                  </View>
+                </View>
+              </Pressable>
+            ) : (
+              <View style={styles.listCard}>
+                <Text style={styles.credNumber}>No credentials on file</Text>
+              </View>
+            )}
+          </View>
         </Animated.View>
       </ScrollView>
 
@@ -244,7 +324,7 @@ export default function Dashboard() {
       <Modal visible={sosOpen} transparent animationType="fade" onRequestClose={() => setSosOpen(false)}>
         <View style={styles.modalScrim}>
           <View style={styles.modalCard} testID="sos-modal">
-            <Ionicons name="alert-circle" size={44} color={theme.colors.danger} style={{ alignSelf: "center" }} />
+            <Ionicons name="alert-circle" size={44} color={light.accentRed} style={{ alignSelf: "center" }} />
             <Text style={styles.sosModalTitle}>Emergency SOS</Text>
             <Text style={styles.sosModalBody}>
               This will alert dispatch, share your location, and place a call to the emergency line.
@@ -263,99 +343,139 @@ export default function Dashboard() {
   );
 }
 
-function ActionButton({ icon, label, onPress, danger, testID }: any) {
+function QuickAction({ icon, label, sub, onPress, danger, testID }: any) {
   const scale = useRef(new Animated.Value(1)).current;
   return (
-    <View style={styles.actionItem}>
-      <Animated.View style={{ transform: [{ scale }] }}>
-        <Pressable
-          testID={testID}
-          onPress={onPress}
-          onPressIn={() => Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, speed: 40 }).start()}
-          onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start()}
-          style={[styles.actionCircle, danger && styles.actionCircleDanger]}
-        >
-          {icon}
-        </Pressable>
-      </Animated.View>
-      <Text style={[styles.actionLabel, danger && styles.actionLabelDanger]}>{label}</Text>
-    </View>
+    <Animated.View style={{ flex: 1, transform: [{ scale }] }}>
+      <Pressable
+        testID={testID}
+        onPress={onPress}
+        onPressIn={() => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 40 }).start()}
+        onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start()}
+        style={[styles.actionCard, danger && styles.actionCardDanger]}
+      >
+        {icon}
+        <Text style={[styles.actionLabel, danger && styles.actionLabelDanger]}>{label}</Text>
+        <Text style={styles.actionSub}>{sub}</Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
-  container: { paddingHorizontal: 24, paddingBottom: 140 },
+  safe: { flex: 1, backgroundColor: light.bg },
+  container: { paddingHorizontal: 20, paddingBottom: 140 },
 
-  greetHeader: { paddingTop: 20, paddingBottom: 40 },
-  greetText: { color: theme.colors.textSecondary, fontSize: 15 },
-  nameText: { color: theme.colors.text, fontSize: 38, fontWeight: "700", marginTop: 2, letterSpacing: -0.6 },
-  notifBtn: { padding: 8 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: theme.colors.accent },
-
-  section: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
+  brandHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 14 },
+  brandLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  brandLogo: { width: 36, height: 36 },
+  brandTitle: { color: light.text, fontSize: 15, fontWeight: "800", letterSpacing: 0.5 },
+  brandSub: { color: light.textSecondary, fontSize: 10, fontWeight: "600", letterSpacing: 0.4, marginTop: 1 },
+  brandRight: { flexDirection: "row", alignItems: "center", gap: 12 },
+  bellBtn: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: "#FFFFFF",
+    borderWidth: 1, borderColor: light.cardBorder, alignItems: "center", justifyContent: "center",
   },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
-  sectionLabel: {
-    color: theme.colors.textSecondary,
-    fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  timeRange: { color: theme.colors.text, fontSize: 24, fontWeight: "700", letterSpacing: -0.4 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
-  metaText: { color: theme.colors.text, fontSize: 17, fontWeight: "500" },
-  metaSubtext: { color: theme.colors.textSecondary, fontSize: 15 },
-  emptyTitle: { color: theme.colors.text, fontSize: 20, fontWeight: "600", marginTop: 4 },
-  emptyBody: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 6 },
-  cta: { marginTop: 22 },
+  bellDot: { position: "absolute", top: 9, right: 10, width: 7, height: 7, borderRadius: 3.5, backgroundColor: light.accentRed },
 
-  actionsRow: {
+  greetWrap: { marginTop: 26, marginBottom: 22 },
+  greetText: { color: light.textSecondary, fontSize: 14 },
+  nameText: { color: light.text, fontSize: 32, fontWeight: "800", marginTop: 2, letterSpacing: -0.5 },
+
+  sectionLabel: { color: light.textSecondary, fontSize: 11, fontWeight: "700", letterSpacing: 0.8, textTransform: "uppercase" },
+
+  assignCard: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 32,
-    paddingHorizontal: 4,
+    alignItems: "flex-start",
+    backgroundColor: light.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: light.cardBorder,
+    padding: 16,
+    marginTop: 12,
+    gap: 12,
   },
-  actionItem: { alignItems: "center", flex: 1 },
-  actionCircle: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    backgroundColor: theme.colors.card,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
+  assignIconWrap: {
+    width: 44, height: 44, borderRadius: 12, backgroundColor: light.chip,
+    alignItems: "center", justifyContent: "center",
+  },
+  assignSite: { color: light.text, fontSize: 16, fontWeight: "700" },
+  assignRole: { color: light.textSecondary, fontSize: 13, marginTop: 2 },
+  assignTimeRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8 },
+  assignTime: { color: light.textSecondary, fontSize: 13 },
+  assignRightCol: { alignItems: "flex-end" },
+  upcomingPill: { flexDirection: "row", alignItems: "center", gap: 5 },
+  upcomingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: light.accentRed },
+  upcomingPillText: { color: light.accentRed, fontSize: 12, fontWeight: "600" },
+
+  clockInBtn: {
+    marginTop: 14,
+    backgroundColor: light.black,
+    borderRadius: 16,
+    paddingVertical: 18,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
   },
-  actionCircleDanger: {
-    backgroundColor: "rgba(255,69,58,0.10)",
-    borderColor: theme.colors.danger,
-  },
-  actionLabel: {
-    color: theme.colors.textSecondary,
-    fontSize: 12,
-    marginTop: 10,
-    fontWeight: "500",
-  },
-  actionLabelDanger: { color: theme.colors.danger, fontWeight: "600" },
-  sosText: { color: theme.colors.danger, fontSize: 15, fontWeight: "800", letterSpacing: 0.5 },
+  clockInText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 
-  upcomingSite: { color: theme.colors.text, fontSize: 18, fontWeight: "600" },
-  upcomingMeta: { color: theme.colors.textSecondary, fontSize: 14 },
+  actionsRow: { flexDirection: "row", gap: 12, marginTop: 22 },
+  actionCard: {
+    backgroundColor: light.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: light.cardBorder,
+    paddingVertical: 16,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+  actionCardDanger: {},
+  actionLabel: { color: light.text, fontSize: 13, fontWeight: "700", marginTop: 8 },
+  actionLabelDanger: { color: light.accentRed },
+  actionSub: { color: light.textSecondary, fontSize: 10, marginTop: 2, textAlign: "center" },
 
-  modalScrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "center", paddingHorizontal: 32 },
-  modalCard: { backgroundColor: theme.colors.cardElevated, borderRadius: 20, padding: 24, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
-  sosModalTitle: { color: theme.colors.text, fontSize: 22, fontWeight: "700", textAlign: "center", marginTop: 10 },
-  sosModalBody: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 10, textAlign: "center", lineHeight: 20 },
-  sosConfirm: { backgroundColor: theme.colors.danger, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
+  block: { marginTop: 30 },
+  blockHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  rowLink: { flexDirection: "row", alignItems: "center", gap: 3 },
+  linkText: { color: light.textSecondary, fontSize: 13, fontWeight: "500" },
+
+  listCard: {
+    backgroundColor: light.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: light.cardBorder,
+    overflow: "hidden",
+  },
+  shiftRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: light.cardBorder },
+  dateBadge: {
+    width: 48, height: 48, borderRadius: 12, borderWidth: 1, borderColor: light.cardBorder,
+    alignItems: "center", justifyContent: "center", backgroundColor: light.chip,
+  },
+  dateBadgeMonth: { color: light.textSecondary, fontSize: 10, fontWeight: "700", letterSpacing: 0.4 },
+  dateBadgeDay: { color: light.text, fontSize: 17, fontWeight: "800", marginTop: 1 },
+  shiftSite: { color: light.text, fontSize: 15, fontWeight: "700" },
+  shiftRole: { color: light.textSecondary, fontSize: 12, marginTop: 1 },
+  shiftTime: { color: light.textSecondary, fontSize: 12, marginTop: 3 },
+  scheduledPill: { backgroundColor: light.chip, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  scheduledPillText: { color: light.textSecondary, fontSize: 11, fontWeight: "600" },
+
+  credRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
+  credIconWrap: {
+    width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: light.cardBorder,
+    alignItems: "center", justifyContent: "center", backgroundColor: light.chip,
+  },
+  credName: { color: light.text, fontSize: 14, fontWeight: "700" },
+  credNumber: { color: light.textSecondary, fontSize: 12, marginTop: 2 },
+  credExpiry: { color: light.accentRed, fontSize: 12, fontWeight: "600" },
+
+  modalScrim: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", paddingHorizontal: 32 },
+  modalCard: { backgroundColor: "#fff", borderRadius: 20, padding: 24, borderWidth: 1, borderColor: light.cardBorder },
+  sosModalTitle: { color: light.text, fontSize: 22, fontWeight: "700", textAlign: "center", marginTop: 10 },
+  sosModalBody: { color: light.textSecondary, fontSize: 14, marginTop: 10, textAlign: "center", lineHeight: 20 },
+  sosConfirm: { backgroundColor: light.accentRed, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
   sosConfirmText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   sosCancel: { paddingVertical: 14, alignItems: "center", marginTop: 4 },
-  sosCancelText: { color: theme.colors.accent, fontSize: 16, fontWeight: "500" },
+  sosCancelText: { color: light.text, fontSize: 16, fontWeight: "500" },
 });
