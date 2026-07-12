@@ -5,6 +5,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import { Avatar } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
@@ -362,8 +363,15 @@ function QuickAction({ icon, label, sub, onPress, danger, tone, testID }: any) {
       >
         {green && (
           <>
-            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={30} tint="light" style={StyleSheet.absoluteFill} />
             <View style={[StyleSheet.absoluteFill, styles.actionCardGreenTint]} />
+            <LinearGradient
+              colors={["rgba(255,255,255,0.30)", "rgba(255,255,255,0.06)", "rgba(0,0,0,0.10)"]}
+              locations={[0, 0.45, 1]}
+              start={{ x: 0.1, y: 0 }}
+              end={{ x: 0.9, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
           </>
         )}
         {icon}
@@ -461,18 +469,18 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   actionCardGreenBase: {
-    backgroundColor: "#2FAE59",
-    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "#3E9E63",
+    borderColor: "rgba(255,255,255,0.35)",
     borderWidth: 1,
     overflow: "hidden",
     shadowColor: "#1E7A3E",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
     elevation: 3,
   },
   actionCardGreenTint: {
-    backgroundColor: "rgba(47,174,89,0.55)",
+    backgroundColor: "rgba(47,174,89,0.62)",
   },
   actionLabel: { color: light.text, fontSize: 13, fontWeight: "700", marginTop: 8 },
   actionLabelDanger: { color: "#fff" },
