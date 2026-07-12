@@ -9,18 +9,32 @@ import { formatDate } from "@/src/utils/format";
 export default function Wallet() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const d = await api("/wallet");
       setData(d);
-    } catch {}
+      setError(false);
+    } catch {
+      setError(true);
+    }
     setLoading(false);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   if (loading) {
     return <SafeAreaView style={styles.safe}><ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} /></SafeAreaView>;
+  }
+
+  if (error || !data) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={[styles.header, { flex: 1, justifyContent: "center", alignItems: "center" }]}>
+          <Text style={{ color: theme.colors.textSecondary, fontSize: 15 }}>Couldn't load your wallet. Pull up or try again shortly.</Text>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   const emp = data.employee;
