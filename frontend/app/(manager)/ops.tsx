@@ -11,10 +11,10 @@ import { api } from "@/src/api/client";
 import { StatusPill, Button } from "@/src/ui";
 import { relativeTime } from "@/src/utils/format";
 
-type OpsTab = "announcements" | "incidents" | "sites";
+type OpsTab = "announcements" | "incidents" | "sites" | "sos" | "swaps" | "live";
 
 const SEVERITY_OPTS = ["info", "warning", "critical"];
-const INCIDENT_STATUSES = ["under_review", "resolved", "dismissed"];
+const INCIDENT_STATUSES = ["under_review", "escalated", "resolved"];
 
 export default function OpsScreen() {
   const [tab, setTab] = useState<OpsTab>("announcements");
@@ -40,16 +40,27 @@ export default function OpsScreen() {
 
   const [saving, setSaving] = useState(false);
 
+  // New feature state
+  const [sosAlerts, setSosAlerts] = useState<any[]>([]);
+  const [liveGuards, setLiveGuards] = useState<any[]>([]);
+  const [swaps, setSwaps] = useState<any[]>([]);
+
   const load = useCallback(async () => {
     try {
-      const [av, iv, sv] = await Promise.all([
+      const [av, iv, sv, sosv, livev, swapv] = await Promise.all([
         api("/admin/announcements"),
         api("/admin/incidents"),
         api("/admin/sites"),
+        api("/sos/active").catch(() => ({ alerts: [] })),
+        api("/ops/live-locations").catch(() => ({ guards: [] })),
+        api("/admin/shift-swaps?status=accepted").catch(() => ({ swaps: [] })),
       ]);
       setAnnouncements(av.announcements ?? []);
       setIncidents(iv.incidents ?? []);
       setSites(sv.sites ?? []);
+      setSosAlerts((sosv as any).alerts ?? []);
+      setLiveGuards((livev as any).guards ?? []);
+      setSwaps((swapv as any).swaps ?? []);
     } catch {}
     setLoading(false);
   }, []);
@@ -83,7 +94,7 @@ export default function OpsScreen() {
     if (!reviewInc) return;
     setSaving(true);
     try {
-      await api(`/admin/incidents/${reviewInc.id}`, { method: "PUT", body: { status: incStatus, notes: incNotes } });
+      await api(`/incidents/${reviewInc.id}/status`, { method: "PATCH", body: { status: incStatus, note: incNotes } });
       await load();
       setReviewInc(null);
     } catch (e: any) { Alert.alert("Error", e.message); }
@@ -137,13 +148,20 @@ export default function OpsScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.tabBar}>
-        {([["announcements", "Announce"], ["incidents", "Incidents"], ["sites", "Sites"]] as const).map(([key, label]) => (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabScroll} contentContainerStyle={styles.tabBar}>
+        {([
+          ["announcements", "Announce"],
+          ["incidents", "Incidents"],
+          ["sites", "Sites"],
+          ["sos", `SOS${sosAlerts.filter(a => a.status === "active").length ? ` (${sosAlerts.filter(a => a.status === "active").length})` : ""}`],
+          ["swaps", `Swaps${swaps.length ? ` (${swaps.length})` : ""}`],
+          ["live", `Live (${liveGuards.length})`],
+        ] as [OpsTab, string][]).map(([key, label]) => (
           <Pressable key={key} onPress={() => setTab(key)} style={[styles.tabItem, tab === key && styles.tabItemActive]}>
             <Text style={[styles.tabLabel, tab === key && styles.tabLabelActive]}>{label}</Text>
           </Pressable>
         ))}
-      </View>
+      </ScrollView>
 
       {loading
         ? <ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} />
@@ -185,6 +203,81 @@ export default function OpsScreen() {
                     <StatusPill label={inc.status} tone={incidentTone(inc.status)} />
                   </View>
                 </Pressable>
+              ))
+            )}
+
+            {/* SOS */}
+            {tab === "sos" && (sosAlerts.length === 0
+              ? <Text style={styles.emptyText}>No active SOS alerts.</Text>
+              : sosAlerts.map(a => (
+                <View key={a.id} style={[styles.card, a.status === "active" && styles.sosCard]}>
+                  <View style={styles.cardRow}>
+                    <Ionicons name="warning" size={22} color={a.status === "active" ? theme.colors.danger : theme.colors.warning} style={{ marginTop: 2 }} />
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardTitle}>{a.user_name} — {a.employee_number}</Text>
+                      <Text style={styles.cardMeta}>{a.message || "No message"}</Text>
+                      <Text style={styles.cardMeta}>{a.latitude?.toFixed(5)}, {a.longitude?.toFixed(5)}</Text>
+                      <Text style={styles.cardMeta}>{relativeTime(a.created_at)} · {a.status.toUpperCase()}</Text>
+                    </View>
+                    <View style={{ gap: 6 }}>
+                      {a.status === "active" && (
+                        <Pressable onPress={async () => { try { await api(`/sos/${a.id}/acknowledge`, { method: "POST" }); await load(); } catch (e: any) { Alert.alert("Error", e.message); } }} style={styles.iconBtn}>
+                          <Ionicons name="checkmark" size={16} color={theme.colors.verified} />
+                        </Pressable>
+                      )}
+                      {a.status !== "resolved" && (
+                        <Pressable onPress={async () => { try { await api(`/sos/${a.id}/resolve`, { method: "POST" }); await load(); } catch (e: any) { Alert.alert("Error", e.message); } }} style={styles.iconBtn}>
+                          <Ionicons name="checkmark-done" size={16} color={theme.colors.textSecondary} />
+                        </Pressable>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
+
+            {/* SWAPS */}
+            {tab === "swaps" && (swaps.length === 0
+              ? <Text style={styles.emptyText}>No swap requests pending approval.</Text>
+              : swaps.map(sw => (
+                <View key={sw.id} style={styles.card}>
+                  <View style={styles.cardRow}>
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardTitle}>{sw.requester_name} → {sw.volunteer_name}</Text>
+                      <Text style={styles.cardMeta}>{sw.site_name ?? "Unknown site"}</Text>
+                      <Text style={styles.cardMeta}>{sw.start ? sw.start.slice(0, 16).replace("T", " ") : ""} – {sw.end ? sw.end.slice(11, 16) : ""}</Text>
+                      {sw.reason && <Text style={styles.cardMeta}>Reason: {sw.reason}</Text>}
+                    </View>
+                    <View style={{ gap: 6 }}>
+                      <Pressable onPress={async () => { try { await api(`/admin/shift-swaps/${sw.id}/decision`, { method: "POST", body: { action: "approve" } }); await load(); } catch (e: any) { Alert.alert("Error", e.message); } }} style={styles.iconBtn}>
+                        <Ionicons name="checkmark" size={16} color={theme.colors.verified} />
+                      </Pressable>
+                      <Pressable onPress={async () => { try { await api(`/admin/shift-swaps/${sw.id}/decision`, { method: "POST", body: { action: "reject" } }); await load(); } catch (e: any) { Alert.alert("Error", e.message); } }} style={styles.iconBtn}>
+                        <Ionicons name="close" size={16} color={theme.colors.danger} />
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              ))
+            )}
+
+            {/* LIVE LOCATIONS */}
+            {tab === "live" && (liveGuards.length === 0
+              ? <Text style={styles.emptyText}>No guards currently clocked in.</Text>
+              : liveGuards.map((g, i) => (
+                <View key={g.user_id + i} style={[styles.card, g.stale && styles.staleCard]}>
+                  <View style={styles.cardRow}>
+                    <View style={[styles.pingDot, { backgroundColor: g.stale ? theme.colors.warning : theme.colors.verified }]} />
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardTitle}>{g.full_name}{g.employee_number ? ` · ${g.employee_number}` : ""}</Text>
+                      <Text style={styles.cardMeta}>{g.site?.name ?? "No site assigned"}</Text>
+                      {g.last_lat != null
+                        ? <Text style={styles.cardMeta}>{(g.last_lat as number).toFixed(5)}, {(g.last_lng as number).toFixed(5)}</Text>
+                        : <Text style={styles.cardMeta}>No GPS yet</Text>}
+                      <Text style={styles.cardMeta}>In since {g.clock_in ? g.clock_in.slice(0, 16).replace("T", " ") : "—"}{g.stale ? " · GPS stale >15 min" : ""}</Text>
+                    </View>
+                  </View>
+                </View>
               ))
             )}
 
@@ -327,11 +420,12 @@ const styles = StyleSheet.create({
   title: { color: theme.colors.text, fontSize: 26, fontWeight: "700" },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(10,132,255,0.12)", borderRadius: theme.radius.pill, paddingHorizontal: 14, paddingVertical: 8, minWidth: 70, minHeight: 36 },
   addBtnText: { color: theme.colors.accent, fontSize: 14, fontWeight: "600" },
-  tabBar: { flexDirection: "row", marginHorizontal: 20, marginBottom: 12, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, padding: 4, gap: 4 },
-  tabItem: { flex: 1, paddingVertical: 8, borderRadius: theme.radius.md, alignItems: "center" },
+  tabScroll: { maxHeight: 50, marginBottom: 12 },
+  tabBar: { flexDirection: "row", paddingHorizontal: 20, backgroundColor: "transparent", gap: 6 },
+  tabItem: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: theme.radius.md, alignItems: "center", backgroundColor: theme.colors.card },
   tabItemActive: { backgroundColor: theme.colors.cardElevated },
-  tabLabel: { color: theme.colors.textSecondary, fontSize: 13, fontWeight: "500" },
-  tabLabelActive: { color: theme.colors.text, fontWeight: "600" },
+  tabLabel: { color: theme.colors.textSecondary, fontSize: 13, fontWeight: "500" as const },
+  tabLabelActive: { color: theme.colors.text, fontWeight: "600" as const },
   list: { paddingHorizontal: 20, paddingBottom: 100 },
   card: { backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, padding: 14, marginBottom: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
   cardRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
@@ -360,5 +454,8 @@ const styles = StyleSheet.create({
   optionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   optionPill: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: theme.radius.pill, backgroundColor: theme.colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border },
   optionPillActive: { borderColor: theme.colors.accent },
-  optionPillText: { color: theme.colors.textSecondary, fontSize: 13, fontWeight: "500" },
+  optionPillText: { color: theme.colors.textSecondary, fontSize: 13, fontWeight: "500" as const },
+  sosCard: { borderColor: theme.colors.danger, borderWidth: 1 },
+  staleCard: { borderColor: theme.colors.warning, borderWidth: 1, opacity: 0.85 },
+  pingDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
 });

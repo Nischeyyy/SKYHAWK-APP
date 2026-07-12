@@ -83,9 +83,11 @@ export default function ShiftDetail() {
         )}
 
         {s.status === "scheduled" && (
-          <View style={{ marginTop: 20 }}>
+          <View style={{ marginTop: 20, gap: 10 }}>
             <Button testID="clock-in-shift" label="Go to Time Clock"
               onPress={() => router.push({ pathname: "/timeclock", params: { shift_id: s.id } })} />
+            <Button testID="request-swap-btn" variant="secondary" label="Request Shift Swap"
+              onPress={() => router.push("/shift-swaps" as any)} />
           </View>
         )}
       </ScrollView>

@@ -147,15 +147,42 @@ export default function Incidents() {
       ) : (
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {items.length === 0 && <Text style={styles.empty}>No incident reports</Text>}
-          {items.map((i, idx) => (
+          {items.map((i, idx) => {
+            const statusColor =
+              i.status === "resolved" ? theme.colors.verified
+              : i.status === "escalated" ? theme.colors.danger
+              : i.status === "under_review" ? theme.colors.accent
+              : i.status === "open" ? theme.colors.warning
+              : theme.colors.textTertiary;
+            const severityColor =
+              i.severity === "critical" ? theme.colors.danger
+              : i.severity === "high" ? theme.colors.warning
+              : theme.colors.textTertiary;
+            return (
             <View key={i.id} testID={`hist-${i.id}`} style={[styles.histRow, idx < items.length - 1 && styles.histRowBorder]}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.histType}>{i.type.replace("_", " ")}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
+                  <Text style={styles.histType}>{i.type.replace(/_/g, " ")}</Text>
+                </View>
                 <Text style={styles.histDesc} numberOfLines={2}>{i.description}</Text>
-                <Text style={styles.histMeta}>{relativeTime(i.created_at)} · {i.status}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+                  <Text style={styles.histMeta}>{relativeTime(i.created_at)}</Text>
+                  <View style={[styles.statusChip, { borderColor: statusColor }]}>
+                    <Text style={[styles.statusChipText, { color: statusColor }]}>
+                      {i.status.replace(/_/g, " ")}
+                    </Text>
+                  </View>
+                </View>
+                {i.audit_trail && i.audit_trail.length > 0 && (
+                  <Text style={styles.lastUpdate}>
+                    {i.audit_trail[i.audit_trail.length - 1].by} — {i.audit_trail[i.audit_trail.length - 1].note || i.audit_trail[i.audit_trail.length - 1].status}
+                  </Text>
+                )}
               </View>
             </View>
-          ))}
+            );
+          })}
         </ScrollView>
       )}
       {toast && (
@@ -173,7 +200,7 @@ const styles = StyleSheet.create({
   title: { color: theme.colors.text, fontSize: 20, fontWeight: "600" },
   segmented: { flexDirection: "row", marginHorizontal: 20, backgroundColor: theme.colors.card, borderRadius: theme.radius.md, padding: 3 },
   segBtn: { flex: 1, paddingVertical: 7, alignItems: "center", borderRadius: theme.radius.sm },
-  segActive: { backgroundColor: theme.colors.cardAlt },
+  segActive: { backgroundColor: theme.colors.cardElevated },
   segText: { color: theme.colors.textSecondary, fontSize: 13 },
   segTextActive: { color: theme.colors.text, fontWeight: "500" },
   label: { color: theme.colors.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6, marginTop: 22, marginBottom: 8 },
@@ -196,6 +223,10 @@ const styles = StyleSheet.create({
   histDesc: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 4, lineHeight: 18 },
   histMeta: { color: theme.colors.textTertiary, fontSize: 12, marginTop: 4, textTransform: "capitalize" },
   empty: { color: theme.colors.textSecondary, textAlign: "center", marginTop: 60, fontSize: 15 },
+  severityDot: { width: 8, height: 8, borderRadius: 4 },
+  statusChip: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 7, paddingVertical: 2 },
+  statusChipText: { fontSize: 11, fontWeight: "500" as const, textTransform: "capitalize" as const },
+  lastUpdate: { color: theme.colors.textTertiary, fontSize: 11, marginTop: 4, fontStyle: "italic" as const },
   toast: { position: "absolute", bottom: 30, left: 20, right: 20, backgroundColor: theme.colors.card, padding: 12, borderRadius: theme.radius.md, alignItems: "center" },
   toastText: { color: theme.colors.text, fontSize: 14 },
 });

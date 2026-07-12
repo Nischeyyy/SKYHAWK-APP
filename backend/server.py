@@ -239,6 +239,50 @@ class SiteAckIn(BaseModel):
     site_id: str
 
 
+class SOSIn(BaseModel):
+    latitude: float
+    longitude: float
+    message: Optional[str] = Field(default=None, max_length=500)
+
+
+class IncidentStatusIn(BaseModel):
+    status: str = Field(max_length=30)
+    note: Optional[str] = Field(default=None, max_length=2000)
+    assigned_to: Optional[str] = Field(default=None, max_length=100)
+
+
+class LocationPingIn(BaseModel):
+    latitude: float
+    longitude: float
+    accuracy_m: Optional[float] = None
+
+
+class SwapRequestIn(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class SwapActionIn(BaseModel):
+    action: str  # approve | reject
+
+
+class PayrollCalculateIn(BaseModel):
+    user_id: str
+    period_start: str
+    period_end: str
+    pay_date: str
+    hourly_rate: float = Field(gt=0)
+    overtime_threshold: float = 40.0
+    overtime_multiplier: float = 1.5
+    tax_rate: float = 0.28
+
+
+class WalletDocIn(BaseModel):
+    type: str = Field(max_length=50)
+    name: str = Field(max_length=200)
+    number: str = Field(max_length=100)
+    expiry: str = Field(max_length=50)
+
+
 # ============================================================
 # App
 # ============================================================
@@ -305,6 +349,11 @@ async def ensure_indexes():
     await db.timeclock.create_index("id", unique=True)
     await db.payroll.create_index("id", unique=True)
     await db.push_tokens.create_index([("user_id", 1), ("device_token", 1)], unique=True)
+    await db.sos_alerts.create_index("id", unique=True)
+    await db.sos_alerts.create_index([("status", 1), ("created_at", -1)])
+    await db.shift_swaps.create_index("id", unique=True)
+    await db.shift_swaps.create_index([("status", 1), ("start", 1)])
+    await db.location_pings.create_index([("timeclock_id", 1), ("ts", -1)])
 
 
 # ============================================================
@@ -1573,6 +1622,468 @@ async def admin_update_timeclock(entry_id: str, body: AdminUpdateTimeclockIn, ad
     if r.matched_count == 0:
         raise HTTPException(404, "Timeclock entry not found")
     return await db.timeclock.find_one({"id": entry_id}, {"_id": 0, "selfie_in": 0, "selfie_out": 0})
+
+
+# ============================================================
+# SOS / PANIC
+# ============================================================
+
+@api.post("/sos", status_code=201)
+async def trigger_sos(body: SOSIn, user=Depends(get_current_user)):
+    alert_id = str(uuid.uuid4())
+    now = now_utc()
+    alert = {
+        "id": alert_id,
+        "user_id": user["id"],
+        "user_name": user["full_name"],
+        "employee_number": user.get("employee_number"),
+        "latitude": body.latitude,
+        "longitude": body.longitude,
+        "message": body.message,
+        "status": "active",
+        "created_at": iso(now),
+        "acknowledged_by": None,
+        "acknowledged_at": None,
+    }
+    await db.sos_alerts.insert_one(alert)
+    alert.pop("_id", None)
+    incident = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "user_name": user["full_name"],
+        "type": "incident",
+        "site_id": None,
+        "description": f"SOS ALERT triggered by {user['full_name']}. GPS: {body.latitude:.5f},{body.longitude:.5f}. {body.message or ''}".strip(),
+        "severity": "critical",
+        "witness_name": None,
+        "witness_contact": None,
+        "photos": [],
+        "signature_base64": None,
+        "status": "open",
+        "sos_alert_id": alert_id,
+        "created_at": iso(now),
+        "audit_trail": [],
+    }
+    await db.incidents.insert_one(incident)
+    admin_ids = [u["id"] async for u in db.users.find({"role": "admin"}, {"id": 1, "_id": 0})]
+    await send_push(
+        admin_ids,
+        {"title": f"🆘 SOS — {user['full_name']}", "message": f"{body.message or 'Guard needs immediate assistance'} · {body.latitude:.4f},{body.longitude:.4f}"},
+        idempotency_key=f"sos-{alert_id}",
+    )
+    logger.warning("SOS triggered by user %s at %s,%s", user["id"], body.latitude, body.longitude)
+    return alert
+
+
+@api.get("/sos/active")
+async def list_sos_active(admin=Depends(require_admin)):
+    alerts = await db.sos_alerts.find(
+        {"status": {"$in": ["active", "acknowledged"]}}, {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    uids = list({a["user_id"] for a in alerts})
+    if uids:
+        um = {u["id"]: u for u in await db.users.find({"id": {"$in": uids}}, {"_id": 0, "hashed_password": 0}).to_list(50)}
+        for a in alerts:
+            a["user"] = um.get(a["user_id"])
+    return {"alerts": alerts}
+
+
+@api.get("/sos/history")
+async def sos_history(admin=Depends(require_admin)):
+    alerts = await db.sos_alerts.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"alerts": alerts}
+
+
+@api.post("/sos/{alert_id}/acknowledge")
+async def acknowledge_sos(alert_id: str, admin=Depends(require_admin)):
+    r = await db.sos_alerts.update_one(
+        {"id": alert_id, "status": "active"},
+        {"$set": {"status": "acknowledged", "acknowledged_by": admin["id"], "acknowledged_at": iso(now_utc())}},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(404, "Alert not found or already acknowledged")
+    alert = await db.sos_alerts.find_one({"id": alert_id}, {"_id": 0})
+    if alert:
+        await send_push(
+            [alert["user_id"]],
+            {"title": "SOS Acknowledged", "message": f"Help is on the way. Acknowledged by {admin['full_name']}."},
+        )
+    return {"acknowledged": True}
+
+
+@api.post("/sos/{alert_id}/resolve")
+async def resolve_sos(alert_id: str, admin=Depends(require_admin)):
+    r = await db.sos_alerts.update_one(
+        {"id": alert_id},
+        {"$set": {"status": "resolved", "resolved_at": iso(now_utc()), "resolved_by": admin["id"]}},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(404, "Alert not found")
+    return {"resolved": True}
+
+
+# ============================================================
+# INCIDENT LIFECYCLE
+# ============================================================
+
+_INCIDENT_STATUSES = {"submitted", "open", "under_review", "escalated", "resolved"}
+
+
+@api.patch("/incidents/{inc_id}/status")
+async def update_incident_status(inc_id: str, body: IncidentStatusIn, admin=Depends(require_admin)):
+    if body.status not in _INCIDENT_STATUSES:
+        raise HTTPException(400, f"Invalid status. Must be one of: {', '.join(_INCIDENT_STATUSES)}")
+    inc = await db.incidents.find_one({"id": inc_id}, {"_id": 0, "photos": 0, "signature_base64": 0})
+    if not inc:
+        raise HTTPException(404, "Incident not found")
+    now = now_utc()
+    update: dict = {"status": body.status, "updated_at": iso(now), "last_updated_by": admin["id"]}
+    if body.assigned_to:
+        update["assigned_to"] = body.assigned_to
+    note_entry = {"ts": iso(now), "by": admin["full_name"], "status": body.status, "note": body.note}
+    await db.incidents.update_one({"id": inc_id}, {"$set": update, "$push": {"audit_trail": note_entry}})
+    if body.status == "resolved":
+        await send_push(
+            [inc["user_id"]],
+            {"title": "Incident Resolved", "message": f"Your {inc['type'].replace('_', ' ')} report has been resolved. {body.note or ''}".strip()},
+        )
+    return await db.incidents.find_one({"id": inc_id}, {"_id": 0, "photos": 0, "signature_base64": 0})
+
+
+@api.get("/incidents/{inc_id}")
+async def get_incident(inc_id: str, user=Depends(get_current_user)):
+    q: dict = {"id": inc_id}
+    if user["role"] != "admin":
+        q["user_id"] = user["id"]
+    inc = await db.incidents.find_one(q, {"_id": 0, "photos": 0, "signature_base64": 0})
+    if not inc:
+        raise HTTPException(404, "Incident not found")
+    return inc
+
+
+# ============================================================
+# LIVE GPS TRACKING
+# ============================================================
+
+@api.post("/timeclock/location-ping")
+async def location_ping(body: LocationPingIn, user=Depends(get_current_user)):
+    active = await db.timeclock.find_one({"user_id": user["id"], "clock_out": None})
+    if not active:
+        raise HTTPException(400, "Not currently clocked in")
+    ping = {
+        "timeclock_id": active["id"],
+        "user_id": user["id"],
+        "latitude": body.latitude,
+        "longitude": body.longitude,
+        "accuracy_m": body.accuracy_m,
+        "ts": iso(now_utc()),
+    }
+    await db.location_pings.insert_one(ping)
+    await db.timeclock.update_one(
+        {"id": active["id"]},
+        {"$set": {"last_ping_lat": body.latitude, "last_ping_lng": body.longitude, "last_ping_ts": iso(now_utc())}},
+    )
+    return {"ok": True}
+
+
+@api.get("/ops/live-locations")
+async def live_locations(admin=Depends(require_admin)):
+    """All guards currently clocked in with their last GPS ping."""
+    active_entries = await db.timeclock.find(
+        {"clock_out": None}, {"_id": 0, "selfie_in": 0, "selfie_out": 0}
+    ).to_list(200)
+    if not active_entries:
+        return {"guards": []}
+    uids = list({e["user_id"] for e in active_entries})
+    sids = list({e["site_id"] for e in active_entries if e.get("site_id")})
+    um = {u["id"]: u for u in await db.users.find({"id": {"$in": uids}}, {"_id": 0, "hashed_password": 0}).to_list(100)}
+    sm = {s["id"]: s for s in await db.sites.find({"id": {"$in": sids}}, {"_id": 0}).to_list(50)} if sids else {}
+    guards = []
+    for entry in active_entries:
+        ud = um.get(entry["user_id"])
+        if not ud:
+            continue
+        last_ts = entry.get("last_ping_ts") or entry["clock_in"]
+        try:
+            stale = (now_utc() - datetime.fromisoformat(last_ts.replace("Z", "+00:00"))).total_seconds() > 900
+        except Exception:
+            stale = True
+        guards.append({
+            "user_id": entry["user_id"],
+            "full_name": ud.get("full_name"),
+            "employee_number": ud.get("employee_number"),
+            "photo_url": ud.get("photo_url"),
+            "site": sm.get(entry.get("site_id")),
+            "clock_in": entry["clock_in"],
+            "last_lat": entry.get("last_ping_lat") or entry.get("clock_in_lat"),
+            "last_lng": entry.get("last_ping_lng") or entry.get("clock_in_lng"),
+            "last_ping_ts": entry.get("last_ping_ts"),
+            "stale": stale,
+        })
+    return {"guards": guards}
+
+
+# ============================================================
+# SHIFT SWAP MARKETPLACE
+# ============================================================
+
+@api.post("/shifts/{shift_id}/request-swap", status_code=201)
+async def request_swap(shift_id: str, body: SwapRequestIn, user=Depends(get_current_user)):
+    shift = await db.shifts.find_one({"id": shift_id, "user_id": user["id"]})
+    if not shift:
+        raise HTTPException(404, "Shift not found or not yours")
+    if shift.get("status") not in ("scheduled",):
+        raise HTTPException(400, "Only scheduled shifts can be swapped")
+    existing = await db.shift_swaps.find_one({"shift_id": shift_id, "status": "open"})
+    if existing:
+        raise HTTPException(400, "A swap request for this shift already exists")
+    site = None
+    if shift.get("site_id"):
+        site = await db.sites.find_one({"id": shift["site_id"]}, {"_id": 0, "name": 1, "id": 1})
+    swap = {
+        "id": str(uuid.uuid4()),
+        "shift_id": shift_id,
+        "requester_id": user["id"],
+        "requester_name": user["full_name"],
+        "site_id": shift.get("site_id"),
+        "site_name": site["name"] if site else None,
+        "start": shift["start"],
+        "end": shift["end"],
+        "role": shift.get("role"),
+        "pay_rate": shift.get("pay_rate"),
+        "reason": body.reason,
+        "status": "open",
+        "volunteer_id": None,
+        "volunteer_name": None,
+        "created_at": iso(now_utc()),
+        "resolved_at": None,
+    }
+    await db.shift_swaps.insert_one(swap)
+    swap.pop("_id", None)
+    admin_ids = [u["id"] async for u in db.users.find({"role": "admin"}, {"id": 1, "_id": 0})]
+    await send_push(admin_ids, {"title": "Shift Swap Requested", "message": f"{user['full_name']} wants to swap their {shift['start'][:10]} shift."})
+    return swap
+
+
+@api.get("/shift-swaps")
+async def list_shift_swaps(user=Depends(get_current_user)):
+    own = await db.shift_swaps.find({"requester_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    marketplace = await db.shift_swaps.find(
+        {"status": "open", "requester_id": {"$ne": user["id"]}}, {"_id": 0}
+    ).sort("start", 1).to_list(50)
+    return {"own": own, "marketplace": marketplace}
+
+
+@api.post("/shift-swaps/{swap_id}/volunteer")
+async def volunteer_swap(swap_id: str, user=Depends(get_current_user)):
+    swap = await db.shift_swaps.find_one({"id": swap_id, "status": "open"})
+    if not swap:
+        raise HTTPException(404, "Swap not found or no longer open")
+    if swap["requester_id"] == user["id"]:
+        raise HTTPException(400, "Cannot volunteer for your own swap")
+    await db.shift_swaps.update_one(
+        {"id": swap_id},
+        {"$set": {"status": "accepted", "volunteer_id": user["id"], "volunteer_name": user["full_name"]}},
+    )
+    admin_ids = [u["id"] async for u in db.users.find({"role": "admin"}, {"id": 1, "_id": 0})]
+    await send_push(
+        admin_ids + [swap["requester_id"]],
+        {"title": "Swap Volunteer", "message": f"{user['full_name']} wants to cover {swap['requester_name']}'s shift on {swap['start'][:10]}."},
+    )
+    return {"volunteered": True}
+
+
+@api.post("/shift-swaps/{swap_id}/cancel")
+async def cancel_swap(swap_id: str, user=Depends(get_current_user)):
+    r = await db.shift_swaps.update_one(
+        {"id": swap_id, "requester_id": user["id"], "status": {"$in": ["open", "accepted"]}},
+        {"$set": {"status": "cancelled", "resolved_at": iso(now_utc())}},
+    )
+    if r.matched_count == 0:
+        raise HTTPException(404, "Swap not found or cannot be cancelled")
+    return {"cancelled": True}
+
+
+@api.post("/admin/shift-swaps/{swap_id}/decision")
+async def admin_swap_decision(swap_id: str, body: SwapActionIn, admin=Depends(require_admin)):
+    if body.action not in ("approve", "reject"):
+        raise HTTPException(400, "action must be 'approve' or 'reject'")
+    swap = await db.shift_swaps.find_one({"id": swap_id, "status": "accepted"})
+    if not swap:
+        raise HTTPException(404, "Swap not found or not in 'accepted' state")
+    if body.action == "approve":
+        await db.shifts.update_one({"id": swap["shift_id"]}, {"$set": {"user_id": swap["volunteer_id"], "swapped_from": swap["requester_id"]}})
+        await db.shift_swaps.update_one({"id": swap_id}, {"$set": {"status": "approved", "resolved_at": iso(now_utc()), "approved_by": admin["id"]}})
+        await send_push(
+            [swap["requester_id"], swap["volunteer_id"]],
+            {"title": "Shift Swap Approved ✓", "message": f"The {swap['start'][:10]} shift has been transferred to {swap['volunteer_name']}."},
+        )
+    else:
+        await db.shift_swaps.update_one({"id": swap_id}, {"$set": {"status": "rejected", "resolved_at": iso(now_utc()), "rejected_by": admin["id"]}})
+        await send_push(
+            [swap["requester_id"], swap["volunteer_id"]],
+            {"title": "Shift Swap Rejected", "message": f"The swap request for {swap['start'][:10]} was not approved."},
+        )
+    return {"action": body.action}
+
+
+@api.get("/admin/shift-swaps")
+async def admin_list_swaps(admin=Depends(require_admin), status: Optional[str] = None):
+    q: dict = {}
+    if status:
+        q["status"] = status
+    swaps = await db.shift_swaps.find(q, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return {"swaps": swaps}
+
+
+# ============================================================
+# PAYROLL ENGINE
+# ============================================================
+
+@api.post("/admin/payroll/calculate", status_code=201)
+async def calculate_payroll(body: PayrollCalculateIn, admin=Depends(require_admin)):
+    user = await db.users.find_one({"id": body.user_id}, {"_id": 0, "hashed_password": 0})
+    if not user:
+        raise HTTPException(404, "User not found")
+    try:
+        ps = datetime.fromisoformat(body.period_start).replace(tzinfo=timezone.utc)
+        pe = datetime.fromisoformat(body.period_end).replace(tzinfo=timezone.utc)
+        pd_dt = datetime.fromisoformat(body.pay_date).replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise HTTPException(400, "Invalid date format. Use ISO 8601 (YYYY-MM-DD)")
+    entries = await db.timeclock.find(
+        {"user_id": body.user_id, "clock_out": {"$ne": None},
+         "clock_in": {"$gte": iso(ps), "$lte": iso(pe + timedelta(days=1))}},
+        {"_id": 0, "selfie_in": 0, "selfie_out": 0},
+    ).to_list(200)
+    total_hours = sum(e.get("hours_worked") or 0 for e in entries)
+    regular_hours = min(total_hours, body.overtime_threshold)
+    overtime_hours = max(0.0, total_hours - body.overtime_threshold)
+    gross = round(regular_hours * body.hourly_rate + overtime_hours * body.hourly_rate * body.overtime_multiplier, 2)
+    net = round(gross * (1 - body.tax_rate), 2)
+    line_items = [{"date": e["clock_in"][:10], "hours": round(e.get("hours_worked") or 0, 2), "shift_id": e.get("shift_id")} for e in entries]
+    record = {
+        "id": str(uuid.uuid4()),
+        "user_id": body.user_id,
+        "user_name": user["full_name"],
+        "employee_number": user.get("employee_number"),
+        "period_start": iso(ps),
+        "period_end": iso(pe),
+        "pay_date": iso(pd_dt),
+        "hours_regular": round(regular_hours, 2),
+        "hours_overtime": round(overtime_hours, 2),
+        "hourly_rate": body.hourly_rate,
+        "overtime_multiplier": body.overtime_multiplier,
+        "tax_rate": body.tax_rate,
+        "gross": gross,
+        "net": net,
+        "status": "submitted",
+        "line_items": line_items,
+        "shifts_count": len(entries),
+        "pay_stub_url": None,
+        "created_at": iso(now_utc()),
+        "created_by": admin["id"],
+    }
+    await db.payroll.insert_one(record)
+    record.pop("_id", None)
+    return record
+
+
+@api.get("/payroll/{period_id}/stub")
+async def payroll_stub(period_id: str, user=Depends(get_current_user)):
+    q: dict = {"id": period_id}
+    if user["role"] != "admin":
+        q["user_id"] = user["id"]
+    period = await db.payroll.find_one(q, {"_id": 0})
+    if not period:
+        raise HTTPException(404, "Payroll period not found")
+    return period
+
+
+# ============================================================
+# COMPLIANCE / CREDENTIAL MANAGEMENT
+# ============================================================
+
+def _compliance_status(expiry_iso: str) -> str:
+    try:
+        expiry_dt = datetime.fromisoformat(expiry_iso.replace("Z", "+00:00"))
+        days_left = (expiry_dt - now_utc()).days
+        if days_left < 0:
+            return "expired"
+        if days_left <= 30:
+            return "expiring_soon"
+        if days_left <= 60:
+            return "expiring"
+        return "valid"
+    except Exception:
+        return "unknown"
+
+
+@api.get("/compliance/status")
+async def my_compliance(user=Depends(get_current_user)):
+    docs = await db.wallet_documents.find({"user_id": user["id"]}, {"_id": 0}).to_list(50)
+    for doc in docs:
+        if doc.get("expiry"):
+            doc["compliance_status"] = _compliance_status(doc["expiry"])
+            try:
+                doc["days_until_expiry"] = (datetime.fromisoformat(doc["expiry"].replace("Z", "+00:00")) - now_utc()).days
+            except Exception:
+                doc["days_until_expiry"] = None
+    expired = [d for d in docs if d.get("compliance_status") == "expired"]
+    expiring_soon = [d for d in docs if d.get("compliance_status") == "expiring_soon"]
+    expiring = [d for d in docs if d.get("compliance_status") == "expiring"]
+    overall = "expired" if expired else ("expiring_soon" if expiring_soon else ("expiring" if expiring else "compliant"))
+    return {"overall_status": overall, "documents": docs, "expired_count": len(expired), "expiring_soon_count": len(expiring_soon)}
+
+
+@api.get("/admin/compliance")
+async def admin_compliance(admin=Depends(require_admin)):
+    guards = await db.users.find({"role": "employee"}, {"_id": 0, "hashed_password": 0}).to_list(200)
+    results = []
+    for g in guards:
+        docs = await db.wallet_documents.find({"user_id": g["id"]}, {"_id": 0}).to_list(50)
+        expired = sum(1 for d in docs if d.get("expiry") and _compliance_status(d["expiry"]) == "expired")
+        expiring_soon = sum(1 for d in docs if d.get("expiry") and _compliance_status(d["expiry"]) == "expiring_soon")
+        lic_status = _compliance_status(g["licence_expiry"]) if g.get("licence_expiry") else "unknown"
+        results.append({
+            "user_id": g["id"],
+            "full_name": g["full_name"],
+            "employee_number": g.get("employee_number"),
+            "licence_expiry": g.get("licence_expiry"),
+            "licence_status": lic_status,
+            "expired_docs": expired,
+            "expiring_soon_docs": expiring_soon,
+            "total_docs": len(docs),
+        })
+    results.sort(key=lambda x: (x["licence_status"] not in ("expired",), x["licence_status"] not in ("expiring_soon",)))
+    return {"guards": results}
+
+
+@api.post("/wallet/documents", status_code=201)
+async def add_wallet_doc(body: WalletDocIn, user=Depends(get_current_user)):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "type": body.type,
+        "name": body.name,
+        "number": body.number,
+        "expiry": body.expiry,
+        "status": _compliance_status(body.expiry),
+        "created_at": iso(now_utc()),
+    }
+    await db.wallet_documents.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.patch("/wallet/documents/{doc_id}")
+async def update_wallet_doc(doc_id: str, body: WalletDocIn, user=Depends(get_current_user)):
+    existing = await db.wallet_documents.find_one({"id": doc_id, "user_id": user["id"]})
+    if not existing:
+        raise HTTPException(404, "Document not found")
+    update = {"name": body.name, "number": body.number, "expiry": body.expiry, "type": body.type, "status": _compliance_status(body.expiry), "updated_at": iso(now_utc())}
+    await db.wallet_documents.update_one({"id": doc_id}, {"$set": update})
+    return await db.wallet_documents.find_one({"id": doc_id}, {"_id": 0})
 
 
 app.include_router(api)

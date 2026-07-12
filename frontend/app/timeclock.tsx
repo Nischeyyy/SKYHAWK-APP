@@ -28,6 +28,25 @@ export default function TimeClock() {
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
   useEffect(() => { api("/timeclock/status").then((d: any) => setActive(d.active)).catch(() => {}); }, []);
 
+  // GPS location ping every 3 minutes while clocked in
+  useEffect(() => {
+    if (!active) return;
+    const ping = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        const l = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        await api("/timeclock/location-ping", {
+          method: "POST",
+          body: { latitude: l.coords.latitude, longitude: l.coords.longitude, accuracy_m: l.coords.accuracy },
+        });
+      } catch {}
+    };
+    ping(); // immediate ping on mount / clock-in
+    const t = setInterval(ping, 3 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [active?.id]);
+
   const beginClockIn = async () => {
     setError(null);
     setStep("locating");
