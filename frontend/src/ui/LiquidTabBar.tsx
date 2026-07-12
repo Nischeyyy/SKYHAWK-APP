@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, Pressable, Platform, LayoutChangeEvent } from "react-native";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
@@ -6,10 +6,8 @@ import * as Haptics from "expo-haptics";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
-  FadeIn,
-  FadeOut,
-  LinearTransition,
+  withTiming,
+  Easing,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
@@ -21,51 +19,43 @@ const tap = () => {
   } catch {}
 };
 
-// A single, critically-damped spring tuned to feel like the system tab bar —
-// quick, no overshoot, no bounce. Reused everywhere so every moving part
-// (pill, icon, label, item reflow) settles in lockstep.
-const LIQUID_SPRING = { damping: 26, stiffness: 320, mass: 0.7, overshootClamping: true } as const;
-const LIQUID_LAYOUT = LinearTransition.damping(26).stiffness(320).mass(0.7);
+// A single smooth ease-out curve, no spring/bounce — this is what makes
+// Apple's own liquid-glass tab bar feel calm instead of "pingy". Every
+// tab bar keeps a fixed number of equal-width slots, so the only thing
+// that ever animates is a 1-D translateX — nothing resizes, nothing
+// reflows, so there is nothing to glitch.
+const LIQUID_CURVE = Easing.bezier(0.22, 1, 0.36, 1);
+const LIQUID_MS = 320;
 
-/**
- * A monochrome, "liquid glass" floating tab bar in the spirit of iOS 18/26 —
- * a single frosted capsule that hugs the bottom of the screen, with a glass
- * pill that glides beneath the active icon and settles without any bounce
- * or jump, the way the system tab bar does.
- */
+const PILL_SIZE = 46;
+
 export function LiquidTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const itemWidths = useRef<number[]>([]).current;
-  const itemX = useRef<number[]>([]).current;
+  const [barWidth, setBarWidth] = useState(0);
+  const routeCount = state.routes.length;
+  const slotWidth = barWidth / Math.max(routeCount, 1);
+
   const pillX = useSharedValue(0);
-  const pillW = useSharedValue(0);
-  const ready = useSharedValue(0);
+  const didInit = useSharedValue(false);
 
-  const onItemLayout = (index: number) => (e: LayoutChangeEvent) => {
-    const { x, width } = e.nativeEvent.layout;
-    itemX[index] = x;
-    itemWidths[index] = width;
-    if (index === state.index) {
-      const settle = ready.value === 0;
-      pillX.value = settle ? x : withSpring(x, LIQUID_SPRING);
-      pillW.value = settle ? width : withSpring(width, LIQUID_SPRING);
-      ready.value = 1;
+  const targetX = slotWidth * state.index + slotWidth / 2 - PILL_SIZE / 2;
+
+  if (barWidth > 0) {
+    if (!didInit.value) {
+      pillX.value = targetX;
+      didInit.value = true;
+    } else if (Math.round(pillX.value) !== Math.round(targetX)) {
+      pillX.value = withTiming(targetX, { duration: LIQUID_MS, easing: LIQUID_CURVE });
     }
-  };
-
-  useEffect(() => {
-    const width = itemWidths[state.index];
-    const x = itemX[state.index];
-    if (width == null || x == null) return;
-    pillX.value = withSpring(x, LIQUID_SPRING);
-    pillW.value = withSpring(width, LIQUID_SPRING);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.index]);
+  }
 
   const pillStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: pillX.value }],
-    width: pillW.value,
   }));
+
+  const onBarLayout = (e: LayoutChangeEvent) => {
+    setBarWidth(e.nativeEvent.layout.width);
+  };
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 14) }]}>
@@ -85,9 +75,11 @@ export function LiquidTabBar({ state, descriptors, navigation }: BottomTabBarPro
           <View style={styles.rim} pointerEvents="none" />
           <View style={styles.specular} pointerEvents="none" />
 
-          <Animated.View style={[styles.pill, pillStyle]} pointerEvents="none" />
+          <View style={styles.row} onLayout={onBarLayout}>
+            {barWidth > 0 && (
+              <Animated.View style={[styles.pill, pillStyle]} pointerEvents="none" />
+            )}
 
-          <View style={styles.row}>
             {state.routes.map((route, index) => {
               const { options } = descriptors[route.key];
               const focused = state.index === index;
@@ -98,16 +90,21 @@ export function LiquidTabBar({ state, descriptors, navigation }: BottomTabBarPro
                   navigation.navigate(route.name);
                 }
               };
+              const icon = options.tabBarIcon
+                ? options.tabBarIcon({
+                    focused,
+                    color: focused ? "#FFFFFF" : "rgba(255,255,255,0.42)",
+                    size: 22,
+                  })
+                : null;
 
               return (
-                <TabItem
-                  key={route.key}
-                  focused={focused}
-                  title={String(options.title ?? route.name)}
-                  icon={options.tabBarIcon}
-                  onPress={onPress}
-                  onLayout={onItemLayout(index)}
-                />
+                <Pressable key={route.key} onPress={onPress} style={styles.item} hitSlop={0}>
+                  <View style={styles.iconWrap}>{icon}</View>
+                  <Text numberOfLines={1} style={[styles.label, focused && styles.labelActive]}>
+                    {String(options.title ?? route.name)}
+                  </Text>
+                </Pressable>
               );
             })}
           </View>
@@ -117,66 +114,7 @@ export function LiquidTabBar({ state, descriptors, navigation }: BottomTabBarPro
   );
 }
 
-function TabItem({
-  focused,
-  title,
-  icon,
-  onPress,
-  onLayout,
-}: {
-  focused: boolean;
-  title: string;
-  icon: any;
-  onPress: () => void;
-  onLayout: (e: LayoutChangeEvent) => void;
-}) {
-  const scale = useSharedValue(1);
-  const iconScale = useSharedValue(focused ? 1.08 : 1);
-
-  useEffect(() => {
-    iconScale.value = withSpring(focused ? 1.08 : 1, LIQUID_SPRING);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focused]);
-
-  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }));
-
-  const node = icon
-    ? icon({ focused, color: focused ? "#FFFFFF" : "rgba(255,255,255,0.42)", size: 22 })
-    : null;
-
-  return (
-    <Animated.View layout={LIQUID_LAYOUT} style={[styles.item, pressStyle]}>
-      <Pressable
-        onPress={onPress}
-        onLayout={onLayout}
-        onPressIn={() => {
-          scale.value = withSpring(0.9, { damping: 20, stiffness: 380 });
-        }}
-        onPressOut={() => {
-          scale.value = withSpring(1, LIQUID_SPRING);
-        }}
-        hitSlop={8}
-        style={styles.itemInner}
-      >
-        <Animated.View style={iconStyle}>{node}</Animated.View>
-        {focused && (
-          <Animated.Text
-            entering={FadeIn.duration(180)}
-            exiting={FadeOut.duration(120)}
-            layout={LIQUID_LAYOUT}
-            numberOfLines={1}
-            style={styles.label}
-          >
-            {title}
-          </Animated.Text>
-        )}
-      </Pressable>
-    </Animated.View>
-  );
-}
-
-const BAR_HEIGHT = 60;
+const BAR_HEIGHT = 64;
 
 const styles = StyleSheet.create({
   wrap: {
@@ -219,9 +157,10 @@ const styles = StyleSheet.create({
   },
   pill: {
     position: "absolute",
-    top: 7,
-    height: BAR_HEIGHT - 14,
-    borderRadius: 999,
+    top: 6,
+    width: PILL_SIZE,
+    height: PILL_SIZE,
+    borderRadius: PILL_SIZE / 2,
     backgroundColor: "rgba(255,255,255,0.16)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.22)",
@@ -230,27 +169,26 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-evenly",
-    paddingHorizontal: 6,
   },
   item: {
-    height: "100%",
-    flexShrink: 0,
-  },
-  itemInner: {
+    flex: 1,
     height: "100%",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
-    flexShrink: 0,
-    gap: 6,
-    paddingHorizontal: 14,
-    minWidth: 44,
+  },
+  iconWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    height: PILL_SIZE - 20,
   },
   label: {
-    color: "#FFFFFF",
-    fontSize: 12.5,
+    color: "rgba(255,255,255,0.42)",
+    fontSize: 10,
     fontWeight: "600",
     letterSpacing: 0.1,
+    marginTop: 2,
+  },
+  labelActive: {
+    color: "#FFFFFF",
   },
 });
