@@ -63,7 +63,8 @@ export default function Schedule() {
   const [weekShifts, setWeekShifts] = useState<any[]>([]);
   const [monthShifts, setMonthShifts] = useState<any[]>([]);
   const [calShifts, setCalShifts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const weekEnd = useMemo(() => addDays(weekAnchor, 7), [weekAnchor]);
@@ -86,6 +87,7 @@ export default function Schedule() {
   }, [monthCursor]);
 
   const load = useCallback(async () => {
+    setFetching(true);
     try {
       if (view === "week") {
         const d = await api(`/schedule?start=${weekAnchor.toISOString()}&end=${weekEnd.toISOString()}`);
@@ -100,10 +102,14 @@ export default function Schedule() {
         setCalShifts(d.shifts || []);
       }
     } catch {}
-    setLoading(false);
+    setFetching(false);
+    setInitialLoading(false);
   }, [view, weekAnchor, weekEnd, calGrid]);
 
-  useFocusEffect(useCallback(() => { setLoading(true); load(); }, [load]));
+  // Data for the newly selected view/week/month is fetched in the background
+  // (see `fetching`) so switching tabs or navigating dates never blanks the
+  // screen — the previous content stays visible until fresh data lands.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -138,13 +144,18 @@ export default function Schedule() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Schedule</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Schedule</Text>
+          {fetching && !initialLoading && (
+            <ActivityIndicator size="small" color={light.textTertiary} style={styles.titleSpinner} />
+          )}
+        </View>
         <View style={styles.segmented}>
           {(["week", "month", "calendar"] as ViewMode[]).map((m) => (
             <Pressable
               key={m}
               testID={`range-${m}`}
-              onPress={() => { tap(); setLoading(true); setView(m); }}
+              onPress={() => { tap(); setView(m); }}
               style={[styles.segBtn, view === m && styles.segActive]}
             >
               <Text style={[styles.segText, view === m && styles.segTextActive]}>
@@ -155,7 +166,7 @@ export default function Schedule() {
         </View>
       </View>
 
-      {loading ? (
+      {initialLoading ? (
         <ActivityIndicator color={light.textSecondary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView
@@ -390,7 +401,9 @@ function AnimatedDayCard({ dayKey, children }: { dayKey: string; children: React
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: light.bg },
   header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 14 },
-  title: { color: light.text, fontSize: 32, fontWeight: "800", letterSpacing: -0.5, marginBottom: 16 },
+  titleRow: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
+  title: { color: light.text, fontSize: 32, fontWeight: "800", letterSpacing: -0.5 },
+  titleSpinner: { marginLeft: 10 },
 
   segmented: { flexDirection: "row", backgroundColor: light.chip, borderRadius: 999, padding: 3 },
   segBtn: { flex: 1, paddingVertical: 9, alignItems: "center", borderRadius: 999 },
