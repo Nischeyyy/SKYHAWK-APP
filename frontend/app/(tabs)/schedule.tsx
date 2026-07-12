@@ -127,29 +127,30 @@ export default function Schedule() {
         </View>
         {/* Stats bar */}
         {stats && (
-          <View style={styles.statsRow}>
-            <View style={styles.statChip}>
-              <Text style={styles.statVal}>{stats.week_hours}h</Text>
-              <Text style={styles.statLbl}>this week</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statChip}>
-              <Text style={styles.statVal}>${stats.week_earnings.toFixed(0)}</Text>
-              <Text style={styles.statLbl}>est. pay</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statChip}>
-              <Text style={styles.statVal}>{stats.upcoming_shifts}</Text>
-              <Text style={styles.statLbl}>upcoming</Text>
+          <View style={styles.statsCard}>
+            <View style={styles.statsRow}>
+              <View style={styles.statChip}>
+                <Text style={styles.statVal} numberOfLines={1}>{stats.week_hours}h</Text>
+                <Text style={styles.statLbl} numberOfLines={1}>this week</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statChip}>
+                <Text style={styles.statVal} numberOfLines={1}>${stats.week_earnings.toFixed(0)}</Text>
+                <Text style={styles.statLbl} numberOfLines={1}>est. pay</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statChip}>
+                <Text style={styles.statVal} numberOfLines={1}>{stats.upcoming_shifts}</Text>
+                <Text style={styles.statLbl} numberOfLines={1}>upcoming</Text>
+              </View>
             </View>
             {stats.needs_ack > 0 && (
-              <>
-                <View style={styles.statDivider} />
-                <View style={[styles.statChip, styles.statChipWarn]}>
-                  <Ionicons name="alert-circle" size={13} color={light.amber} />
-                  <Text style={[styles.statLbl, { color: light.amber, marginLeft: 3 }]}>{stats.needs_ack} unread</Text>
-                </View>
-              </>
+              <View style={styles.unreadRow}>
+                <Ionicons name="alert-circle" size={13} color={light.amber} />
+                <Text style={styles.unreadText} numberOfLines={1}>
+                  {stats.needs_ack} unread {stats.needs_ack === 1 ? "shift" : "shifts"} need acknowledgement
+                </Text>
+              </View>
             )}
           </View>
         )}
@@ -358,12 +359,18 @@ const styles = StyleSheet.create({
   title: { color: light.text, fontSize: 32, fontWeight: "800", letterSpacing: -0.5 },
   titleSpinner: { marginLeft: 10 },
 
-  statsRow: { flexDirection: "row", alignItems: "center", backgroundColor: light.card, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 14, borderWidth: 1, borderColor: light.cardBorder },
-  statChip: { flexDirection: "row", alignItems: "center", gap: 4 },
-  statChipWarn: {},
-  statVal: { color: light.text, fontSize: 14, fontWeight: "700" },
-  statLbl: { color: light.textTertiary, fontSize: 11 },
+  statsCard: { backgroundColor: light.card, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 14, borderWidth: 1, borderColor: light.cardBorder },
+  statsRow: { flexDirection: "row", alignItems: "center" },
+  statChip: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1, minWidth: 0 },
+  statVal: { color: light.text, fontSize: 14, fontWeight: "700", flexShrink: 1 },
+  statLbl: { color: light.textTertiary, fontSize: 11, flexShrink: 1 },
   statDivider: { width: 1, height: 16, backgroundColor: light.cardBorder, marginHorizontal: 10 },
+  unreadRow: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    marginTop: 10, paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: light.cardBorder,
+  },
+  unreadText: { color: light.amber, fontSize: 12, fontWeight: "600", flexShrink: 1 },
 
   segmented: { flexDirection: "row", backgroundColor: light.chip, borderRadius: 999, padding: 3 },
   segBtn: { flex: 1, paddingVertical: 9, alignItems: "center", borderRadius: 999 },
