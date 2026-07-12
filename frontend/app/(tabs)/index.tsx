@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
+import { BlurView } from "expo-blur";
 import { Avatar } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
@@ -353,8 +354,18 @@ function QuickAction({ icon, label, sub, onPress, danger, tone, testID }: any) {
         onPress={onPress}
         onPressIn={() => Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, speed: 40 }).start()}
         onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start()}
-        style={[styles.actionCard, danger && styles.actionCardDanger, green && styles.actionCardGreen]}
+        style={[
+          styles.actionCard,
+          danger && styles.actionCardDanger,
+          green && styles.actionCardGreenBase,
+        ]}
       >
+        {green && (
+          <>
+            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, styles.actionCardGreenTint]} />
+          </>
+        )}
         {icon}
         <Text style={[styles.actionLabel, danger && styles.actionLabelDanger, green && styles.actionLabelGreen]}>{label}</Text>
         <Text style={[styles.actionSub, danger && styles.actionSubDanger, green && styles.actionSubGreen]}>{sub}</Text>
@@ -449,14 +460,19 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
   },
-  actionCardGreen: {
+  actionCardGreenBase: {
     backgroundColor: "#2FAE59",
-    borderColor: "#2FAE59",
-    shadowColor: "#2FAE59",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    overflow: "hidden",
+    shadowColor: "#1E7A3E",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  actionCardGreenTint: {
+    backgroundColor: "rgba(47,174,89,0.55)",
   },
   actionLabel: { color: light.text, fontSize: 13, fontWeight: "700", marginTop: 8 },
   actionLabelDanger: { color: "#fff" },
