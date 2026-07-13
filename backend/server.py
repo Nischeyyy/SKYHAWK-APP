@@ -5,6 +5,8 @@ import os
 import uuid
 import json
 import logging
+import secrets
+import mimetypes
 from pathlib import Path
 from datetime import datetime, timedelta, timezone, date
 from typing import Optional, List, Annotated
@@ -13,9 +15,10 @@ from contextlib import asynccontextmanager
 import jwt
 import bcrypt
 import httpx
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Query, Request, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
@@ -24,6 +27,8 @@ from pymongo.errors import PyMongoError, ServerSelectionTimeoutError  # noqa: F4
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas as pdf_canvas
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -46,6 +51,21 @@ JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
 JWT_EXPIRE_HOURS = int(os.environ.get("JWT_EXPIRE_HOURS", "168"))
 EMERGENT_PUSH_KEY = os.environ.get("EMERGENT_PUSH_KEY", "placeholder")
 PUSH_BASE_URL = "https://integrations.emergentagent.com"
+# The external push provider requires a real key; without one, skip the network
+# call entirely instead of generating a 401 for every notification attempt.
+PUSH_ENABLED = bool(EMERGENT_PUSH_KEY) and EMERGENT_PUSH_KEY != "placeholder"
+
+UPLOAD_DIR = ROOT_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+(UPLOAD_DIR / "paystubs").mkdir(exist_ok=True)
+(UPLOAD_DIR / "attachments").mkdir(exist_ok=True)
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+ALLOWED_UPLOAD_TYPES = {
+    "image/jpeg", "image/png", "image/webp", "image/heic",
+    "application/pdf",
+}
+
+RESET_TOKEN_TTL_MINUTES = 30
 
 class _JSONFormatter(logging.Formatter):
     """Emit one JSON object per log line for easy machine parsing."""
@@ -157,6 +177,10 @@ async def send_push(recipients: list[str], data: dict, idempotency_key: Optional
     if not recipients:
         return
     if "title" not in data or "message" not in data:
+        return
+    if not PUSH_ENABLED:
+        # No real push provider key configured — this is expected in dev/demo
+        # environments. Avoid spamming logs with a 401 per notification.
         return
     payload = {"recipients": recipients, "data": data}
     if idempotency_key:
@@ -294,6 +318,27 @@ class CommunityCommentIn(BaseModel):
     body: str = Field(min_length=1, max_length=1000)
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6)
+
+
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(BaseModel):
+    token: str
+    new_password: str = Field(min_length=6)
+
+
+class SettingsIn(BaseModel):
+    push_notifications: Optional[bool] = None
+    location_sharing: Optional[bool] = None
+    shift_reminders: Optional[bool] = None
+    community_notifications: Optional[bool] = None
+
+
 # ============================================================
 # App
 # ============================================================
@@ -367,6 +412,7 @@ async def ensure_indexes():
     await db.location_pings.create_index([("timeclock_id", 1), ("ts", -1)])
     await db.community_posts.create_index("id", unique=True)
     await db.community_posts.create_index([("type", 1), ("created_at", -1)])
+    await db.password_resets.create_index("user_id", unique=True)
 
 
 # ============================================================
@@ -698,6 +744,12 @@ async def register(request: Request, body: RegisterIn):
         "photo_url": None,
         "emergency_contact": None,
         "onboarding_complete": False,
+        "preferences": {
+            "push_notifications": True,
+            "location_sharing": True,
+            "shift_reminders": True,
+            "community_notifications": True,
+        },
         "created_at": iso(now_utc()),
     }
     await db.users.insert_one(user)
@@ -722,6 +774,116 @@ async def login(request: Request, body: LoginIn):
 @api.get("/auth/me")
 async def me(user=Depends(get_current_user)):
     return user
+
+
+@api.post("/auth/change-password")
+@limiter.limit("5/minute")
+async def change_password(request: Request, body: ChangePasswordIn, user=Depends(get_current_user)):
+    full_user = await db.users.find_one({"id": user["id"]})
+    if not full_user or not verify_password(body.current_password, full_user["hashed_password"]):
+        raise HTTPException(401, "Current password is incorrect")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"hashed_password": hash_password(body.new_password)}},
+    )
+    # Invalidate any outstanding reset tokens once the password changes.
+    await db.password_resets.delete_many({"user_id": user["id"]})
+    return {"status": "password_updated"}
+
+
+@api.post("/auth/forgot-password")
+@limiter.limit("5/minute")
+async def forgot_password(request: Request, body: ForgotPasswordIn):
+    user = await db.users.find_one({"email": body.email.lower()})
+    # Always return a generic response so this endpoint can't be used to
+    # enumerate registered emails.
+    generic = {"status": "if_registered_email_sent"}
+    if not user:
+        return generic
+    raw_token = secrets.token_urlsafe(32)
+    await db.password_resets.update_one(
+        {"user_id": user["id"]},
+        {"$set": {
+            "user_id": user["id"],
+            "token_hash": hash_password(raw_token),
+            "expires_at": iso(now_utc() + timedelta(minutes=RESET_TOKEN_TTL_MINUTES)),
+            "created_at": iso(now_utc()),
+        }},
+        upsert=True,
+    )
+    # No transactional-email provider is connected yet, so the reset link is
+    # logged server-side instead of emailed. Wire up an email integration
+    # (e.g. SendGrid/Resend) and replace this log line with an actual send.
+    logger.info(f"Password reset requested for {user['email']}", extra={"reset_token": raw_token})
+    return generic
+
+
+@api.post("/auth/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(request: Request, body: ResetPasswordIn):
+    candidates = await db.password_resets.find({"expires_at": {"$gte": iso(now_utc())}}).to_list(1000)
+    match = next((c for c in candidates if verify_password(body.token, c["token_hash"])), None)
+    if not match:
+        raise HTTPException(400, "Invalid or expired reset token")
+    await db.users.update_one(
+        {"id": match["user_id"]},
+        {"$set": {"hashed_password": hash_password(body.new_password)}},
+    )
+    await db.password_resets.delete_many({"user_id": match["user_id"]})
+    return {"status": "password_reset"}
+
+
+# ============================================================
+# SETTINGS / PREFERENCES
+# ============================================================
+@api.get("/settings")
+async def get_settings(user=Depends(get_current_user)):
+    defaults = {
+        "push_notifications": True,
+        "location_sharing": True,
+        "shift_reminders": True,
+        "community_notifications": True,
+    }
+    return {**defaults, **(user.get("preferences") or {})}
+
+
+@api.put("/settings")
+async def update_settings(body: SettingsIn, user=Depends(get_current_user)):
+    updates = {f"preferences.{k}": v for k, v in body.model_dump(exclude_none=True).items()}
+    if updates:
+        await db.users.update_one({"id": user["id"]}, {"$set": updates})
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "hashed_password": 0})
+    defaults = {
+        "push_notifications": True,
+        "location_sharing": True,
+        "shift_reminders": True,
+        "community_notifications": True,
+    }
+    return {**defaults, **(fresh.get("preferences") or {})}
+
+
+# ============================================================
+# FILE UPLOADS
+# ============================================================
+@api.post("/uploads", status_code=201)
+@limiter.limit("20/minute")
+async def upload_file(request: Request, file: UploadFile = File(...), user=Depends(get_current_user)):
+    if file.content_type not in ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(400, f"Unsupported file type: {file.content_type}")
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "File too large (max 10 MB)")
+    ext = mimetypes.guess_extension(file.content_type) or ""
+    stored_name = f"{uuid.uuid4()}{ext}"
+    dest = UPLOAD_DIR / "attachments" / stored_name
+    dest.write_bytes(contents)
+    return {
+        "url": f"/uploads/attachments/{stored_name}",
+        "name": file.filename,
+        "content_type": file.content_type,
+        "size": len(contents),
+        "kind": "image" if file.content_type.startswith("image/") else "pdf",
+    }
 
 
 # ============================================================
@@ -2098,6 +2260,67 @@ async def admin_list_swaps(admin=Depends(require_admin), status: Optional[str] =
 # PAYROLL ENGINE
 # ============================================================
 
+def _generate_pay_stub_pdf(record: dict) -> str:
+    """Render a simple one-page pay stub PDF and return its served URL."""
+    filename = f"{record['id']}.pdf"
+    path = UPLOAD_DIR / "paystubs" / filename
+    c = pdf_canvas.Canvas(str(path), pagesize=letter)
+    width, height = letter
+    y = height - 72
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(72, y, "Skyhawk Security Operations")
+    y -= 18
+    c.setFont("Helvetica", 10)
+    c.drawString(72, y, "Pay Stub")
+    y -= 30
+
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(72, y, record["user_name"])
+    c.drawString(320, y, f"Employee #: {record.get('employee_number', '-')}")
+    y -= 16
+    c.setFont("Helvetica", 10)
+    c.drawString(72, y, f"Pay period: {record['period_start'][:10]} - {record['period_end'][:10]}")
+    y -= 14
+    c.drawString(72, y, f"Pay date: {record['pay_date'][:10]}")
+    y -= 30
+
+    rows = [
+        ("Regular hours", f"{record['hours_regular']:.2f}"),
+        ("Overtime hours", f"{record['hours_overtime']:.2f}"),
+        ("Hourly rate", f"${record['hourly_rate']:.2f}"),
+        ("Overtime multiplier", f"{record['overtime_multiplier']:.2f}x"),
+        ("Gross pay", f"${record['gross']:.2f}"),
+        ("Tax withheld", f"${record['gross'] - record['net']:.2f}"),
+        ("Net pay", f"${record['net']:.2f}"),
+    ]
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(72, y, "Summary")
+    y -= 16
+    c.setFont("Helvetica", 10)
+    for label, value in rows:
+        c.drawString(80, y, label)
+        c.drawRightString(300, y, value)
+        y -= 14
+
+    y -= 16
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(72, y, "Shift detail")
+    y -= 16
+    c.setFont("Helvetica", 9)
+    for item in record.get("line_items", [])[:25]:
+        if y < 72:
+            c.showPage()
+            y = height - 72
+        c.drawString(80, y, item.get("date", ""))
+        c.drawRightString(300, y, f"{item.get('hours', 0):.2f} h")
+        y -= 12
+
+    c.showPage()
+    c.save()
+    return f"/uploads/paystubs/{filename}"
+
+
 @api.post("/admin/payroll/calculate", status_code=201)
 async def calculate_payroll(body: PayrollCalculateIn, admin=Depends(require_admin)):
     user = await db.users.find_one({"id": body.user_id}, {"_id": 0, "hashed_password": 0})
@@ -2142,6 +2365,7 @@ async def calculate_payroll(body: PayrollCalculateIn, admin=Depends(require_admi
         "created_at": iso(now_utc()),
         "created_by": admin["id"],
     }
+    record["pay_stub_url"] = _generate_pay_stub_pdf(record)
     await db.payroll.insert_one(record)
     record.pop("_id", None)
     return record
@@ -2339,6 +2563,14 @@ async def add_community_comment(post_id: str, body: CommunityCommentIn, user=Dep
     return _serialize_post(post, user["id"])
 
 
+@api.delete("/admin/community/posts/{post_id}")
+async def admin_delete_community_post(post_id: str, admin=Depends(require_admin)):
+    r = await db.community_posts.delete_one({"id": post_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Post not found")
+    return {"deleted": True}
+
+
 app.include_router(api)
 
 app.add_middleware(
@@ -2348,3 +2580,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve user-uploaded files (incident/community attachments, generated pay stubs).
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")

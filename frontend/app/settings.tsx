@@ -1,9 +1,11 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Switch } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, Switch, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/src/auth/AuthContext";
+import { api } from "@/src/api/client";
 
 // ─── Light palette (matches Profile / Schedule) ─────────────────────────────
 const C = {
@@ -46,8 +48,40 @@ function NavRow({ icon, label, onPress, last, danger, testID }: any) {
 export default function Settings() {
   const router = useRouter();
   const { logout, user } = useAuth();
+  const [loaded, setLoaded] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      api("/settings").then((s) => {
+        if (!active) return;
+        setPushEnabled(s.push_notifications);
+        setLocationEnabled(s.location_sharing);
+        setLoaded(true);
+      }).catch(() => setLoaded(true));
+      return () => { active = false; };
+    }, [])
+  );
+
+  const updateSetting = (key: "push_notifications" | "location_sharing", value: boolean) => {
+    if (key === "push_notifications") setPushEnabled(value);
+    else setLocationEnabled(value);
+    api("/settings", { method: "PUT", body: { [key]: value } }).catch(() => {
+      // Revert on failure so the UI never claims a preference was saved when it wasn't.
+      if (key === "push_notifications") setPushEnabled(!value);
+      else setLocationEnabled(!value);
+    });
+  };
+
+  if (!loaded) {
+    return (
+      <SafeAreaView style={[styles.safe, { alignItems: "center", justifyContent: "center" }]} edges={["top"]}>
+        <ActivityIndicator color={C.accent} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -61,8 +95,8 @@ export default function Settings() {
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionLabel}>Notifications</Text>
         <View style={styles.card}>
-          <ToggleRow icon="notifications-outline" label="Push Notifications" value={pushEnabled} onChange={setPushEnabled} />
-          <ToggleRow icon="location-outline" label="Shift Location Tracking" value={locationEnabled} onChange={setLocationEnabled} last />
+          <ToggleRow icon="notifications-outline" label="Push Notifications" value={pushEnabled} onChange={(v) => updateSetting("push_notifications", v)} />
+          <ToggleRow icon="location-outline" label="Shift Location Tracking" value={locationEnabled} onChange={(v) => updateSetting("location_sharing", v)} last />
         </View>
 
         <Text style={styles.sectionLabel}>Account</Text>
