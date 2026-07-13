@@ -102,7 +102,8 @@ export default function Settings() {
         <Text style={styles.sectionLabel}>Account</Text>
         <View style={styles.card}>
           <NavRow testID="go-employment" icon="briefcase-outline" label="Employment Details" onPress={() => router.push("/employment")} />
-          <NavRow testID="go-payroll" icon="cash-outline" label="Payroll" onPress={() => router.push("/payroll")} last />
+          <NavRow testID="go-payroll" icon="cash-outline" label="Payroll" onPress={() => router.push("/payroll")} />
+          <NavRow testID="go-change-password" icon="lock-closed-outline" label="Change Password" onPress={() => router.push("/change-password" as any)} last />
         </View>
 
         <Text style={styles.sectionLabel}>About</Text>

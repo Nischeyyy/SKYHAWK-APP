@@ -38,6 +38,42 @@ export async function getToken() {
   return await getStoredToken();
 }
 
+/**
+ * Upload a file via multipart/form-data (e.g. to POST /uploads).
+ * `file` is a React Native picker asset shape: { uri, name?, type? }.
+ */
+export async function apiUpload<T = any>(
+  path: string,
+  file: { uri: string; name?: string; type?: string }
+): Promise<T> {
+  const token = await getStoredToken();
+  const form = new FormData();
+  form.append('file', {
+    uri: file.uri,
+    name: file.name || 'upload.jpg',
+    type: file.type || 'image/jpeg',
+  } as any);
+
+  const res = await fetch(`${BASE}/api${path}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  if (!res.ok) {
+    const msg = (data && (data.detail || data.message)) || `Upload failed (${res.status})`;
+    throw new Error(msg);
+  }
+  return data as T;
+}
+
 /** Status codes worth retrying on (GET only, to avoid duplicate side-effects). */
 const RETRYABLE_STATUS = new Set([408, 502, 503, 504]);
 const MAX_RETRIES = 3;

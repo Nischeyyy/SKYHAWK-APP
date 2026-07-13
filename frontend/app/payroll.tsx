@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
-  ActivityIndicator, Modal,
+  ActivityIndicator, Modal, Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -176,9 +176,20 @@ export default function Payroll() {
           <SafeAreaView style={styles.safe} edges={["top"]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Pay Stub</Text>
-              <Pressable onPress={() => setStubPeriod(null)} hitSlop={12}>
-                <Ionicons name="close" size={24} color={theme.colors.text} />
-              </Pressable>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
+                {stubPeriod.pay_stub_url && (
+                  <Pressable
+                    testID="view-pdf-btn"
+                    hitSlop={10}
+                    onPress={() => Linking.openURL(`${process.env.EXPO_PUBLIC_BACKEND_URL || ""}${stubPeriod.pay_stub_url}`)}
+                  >
+                    <Ionicons name="document-text-outline" size={22} color={theme.colors.accent} />
+                  </Pressable>
+                )}
+                <Pressable onPress={() => setStubPeriod(null)} hitSlop={12}>
+                  <Ionicons name="close" size={24} color={theme.colors.text} />
+                </Pressable>
+              </View>
             </View>
 
             {stubLoading ? (

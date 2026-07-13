@@ -1,12 +1,13 @@
 import React, { useCallback, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, TextInput,
-  ActivityIndicator, KeyboardAvoidingView, Platform,
+  ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { api } from "@/src/api/client";
+import * as ImagePicker from "expo-image-picker";
+import { api, apiUpload } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
 import { relativeTime } from "@/src/utils/format";
 import { success as hapticSuccess } from "@/src/utils/haptics";
@@ -70,6 +71,9 @@ export default function Community() {
   const [posting, setPosting] = useState(false);
   const [openComments, setOpenComments] = useState<string | null>(null);
   const [commentDraft, setCommentDraft] = useState("");
+  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; name: string; kind: string; size: number } | null>(null);
+  const [attaching, setAttaching] = useState(false);
+  const isAdmin = user?.role === "admin";
 
   const load = useCallback(async (f: string) => {
     try {
@@ -82,18 +86,53 @@ export default function Community() {
 
   useFocusEffect(useCallback(() => { setLoading(true); load(filter); }, [load, filter]));
 
+  const pickAttachment = async () => {
+    const p = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!p.granted) return;
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6 });
+    if (r.canceled || !r.assets[0]) return;
+    const asset = r.assets[0];
+    setAttaching(true);
+    try {
+      const uploaded = await apiUpload<{ url: string; name: string; content_type: string; size: number; kind: string }>(
+        "/uploads",
+        { uri: asset.uri, name: asset.fileName || "photo.jpg", type: asset.mimeType || "image/jpeg" }
+      );
+      setPendingAttachment({ url: uploaded.url, name: uploaded.name, kind: uploaded.kind, size: uploaded.size });
+    } catch (e: any) {
+      Alert.alert("Upload failed", e.message || "Could not upload photo");
+    }
+    setAttaching(false);
+  };
+
   const submitPost = async () => {
     const body = draft.trim();
     if (!body || posting) return;
     setPosting(true);
     try {
-      const created = await api("/community/posts", { method: "POST", body: { body, type: "post" } });
+      const attachments = pendingAttachment
+        ? [{ url: pendingAttachment.url, name: pendingAttachment.name, kind: pendingAttachment.kind, size_label: `${Math.round(pendingAttachment.size / 1024)} KB` }]
+        : [];
+      const created = await api("/community/posts", { method: "POST", body: { body, type: "post", attachments } });
       hapticSuccess();
       setDraft("");
+      setPendingAttachment(null);
       if (filter === "all") setPosts((prev) => [created, ...prev]);
       else load(filter);
     } catch {}
     setPosting(false);
+  };
+
+  const deletePost = (id: string) => {
+    Alert.alert("Delete post", "Remove this post for everyone?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete", style: "destructive", onPress: async () => {
+          setPosts((prev) => prev.filter((p) => p.id !== id));
+          try { await api(`/admin/community/posts/${id}`, { method: "DELETE" }); } catch { load(filter); }
+        },
+      },
+    ]);
   };
 
   const toggleLike = async (id: string) => {
@@ -167,14 +206,24 @@ export default function Community() {
                 />
                 <Ionicons name="mic-outline" size={18} color={C.textTertiary} />
               </View>
+              {pendingAttachment && (
+                <View style={styles.pendingAttachment}>
+                  <Ionicons name={pendingAttachment.kind === "image" ? "image" : "document"} size={16} color={C.accent} />
+                  <Text style={styles.pendingAttachmentName} numberOfLines={1}>{pendingAttachment.name}</Text>
+                  <Pressable testID="remove-attachment" onPress={() => setPendingAttachment(null)} hitSlop={8}>
+                    <Ionicons name="close-circle" size={16} color={C.textTertiary} />
+                  </Pressable>
+                </View>
+              )}
               <View style={styles.composerToolbar}>
                 <View style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
-                  <Ionicons name="image-outline" size={19} color={C.textSecondary} />
-                  <Ionicons name="document-attach-outline" size={19} color={C.textSecondary} />
-                  <Ionicons name="location-outline" size={19} color={C.textSecondary} />
+                  <Pressable testID="attach-photo-btn" onPress={pickAttachment} disabled={attaching} hitSlop={6}>
+                    {attaching
+                      ? <ActivityIndicator size="small" color={C.textSecondary} />
+                      : <Ionicons name="image-outline" size={19} color={pendingAttachment ? C.accent : C.textSecondary} />}
+                  </Pressable>
                   <Ionicons name="happy-outline" size={19} color={C.textSecondary} />
                   <Ionicons name="pricetag-outline" size={19} color={C.textSecondary} />
-                  <Ionicons name="ellipsis-horizontal" size={19} color={C.textSecondary} />
                 </View>
                 <Pressable
                   testID="post-btn"
@@ -226,9 +275,11 @@ export default function Community() {
                         <Text style={styles.postAuthor}>{p.author_name}</Text>
                         <Text style={styles.postMeta}>@{p.author_handle} · {relativeTime(p.created_at)}</Text>
                       </View>
-                      <Pressable hitSlop={8}>
-                        <Ionicons name="ellipsis-vertical" size={16} color={C.textTertiary} />
-                      </Pressable>
+                      {isAdmin && (
+                        <Pressable testID={`post-menu-${p.id}`} onPress={() => deletePost(p.id)} hitSlop={8}>
+                          <Ionicons name="trash-outline" size={16} color={C.textTertiary} />
+                        </Pressable>
+                      )}
                     </View>
 
                     {meta && (
@@ -242,16 +293,21 @@ export default function Community() {
                     <Text style={styles.postBody}>{p.body}</Text>
 
                     {p.attachments?.map((a: any, i: number) => (
-                      <View key={i} style={styles.attachmentCard}>
+                      <Pressable
+                        key={i}
+                        testID={`attachment-${p.id}-${i}`}
+                        style={styles.attachmentCard}
+                        onPress={() => a.url && Linking.openURL(`${process.env.EXPO_PUBLIC_BACKEND_URL || ""}${a.url}`)}
+                      >
                         <View style={styles.attachmentIcon}>
-                          <Ionicons name="location" size={18} color={C.blue} />
+                          <Ionicons name={a.kind === "image" ? "image" : "document"} size={18} color={C.blue} />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={styles.attachmentName} numberOfLines={1}>{a.name}</Text>
                           <Text style={styles.attachmentSub}>{(a.kind || "file").toUpperCase()} · {a.size_label}</Text>
                         </View>
                         <Ionicons name="download-outline" size={18} color={C.textSecondary} />
-                      </View>
+                      </Pressable>
                     ))}
 
                     <View style={styles.postFooter}>
@@ -330,6 +386,9 @@ const styles = StyleSheet.create({
   postBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "600" },
   postBtnDisabled: { backgroundColor: C.accentSoft },
   postBtnTextDisabled: { color: C.accent, opacity: 0.5 },
+
+  pendingAttachment: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: C.accentSoft, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, marginTop: 10 },
+  pendingAttachmentName: { flex: 1, color: C.accent, fontSize: 12.5, fontWeight: "500" },
 
   chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.accentSoft, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20 },
   chipActive: { backgroundColor: C.accent },
