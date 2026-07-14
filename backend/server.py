@@ -29,6 +29,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas as pdf_canvas
+import notifications as notif
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -349,6 +350,7 @@ async def lifespan(app: FastAPI):
         logger.info("Database indexes ensured")
     except Exception as exc:
         logger.error("Failed to create DB indexes — check MONGO_URL: %s", exc)
+    notif.log_status()
     try:
         await seed_data()
     except Exception as exc:
@@ -413,6 +415,8 @@ async def ensure_indexes():
     await db.community_posts.create_index("id", unique=True)
     await db.community_posts.create_index([("type", 1), ("created_at", -1)])
     await db.password_resets.create_index("user_id", unique=True)
+    await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
+    await db.notifications.create_index([("user_id", 1), ("read", 1)])
 
 
 # ============================================================
@@ -811,10 +815,29 @@ async def forgot_password(request: Request, body: ForgotPasswordIn):
         }},
         upsert=True,
     )
-    # No transactional-email provider is connected yet, so the reset link is
-    # logged server-side instead of emailed. Wire up an email integration
-    # (e.g. SendGrid/Resend) and replace this log line with an actual send.
-    logger.info(f"Password reset requested for {user['email']}", extra={"reset_token": raw_token})
+    reset_link = f"skyhawksecurity://reset-password?token={raw_token}"
+    html = notif.email_template(
+        "Reset your Skyhawk password",
+        [
+            f"Hi {user.get('full_name', 'there')},",
+            "We received a request to reset your password. Click the button below — "
+            "the link expires in <strong>30 minutes</strong>.",
+            "If you didn't request this, you can safely ignore this email.",
+        ],
+        cta_text="Reset Password",
+        cta_link=reset_link,
+    )
+    sent = await notif.send_email(
+        user["email"],
+        "Reset your Skyhawk Security password",
+        html,
+        f"Password reset link (expires in 30 min): {reset_link}",
+    )
+    if not sent:
+        logger.info(
+            "Password reset token (email not configured)",
+            extra={"reset_token": raw_token, "user": user["email"]},
+        )
     return generic
 
 
@@ -860,6 +883,41 @@ async def update_settings(body: SettingsIn, user=Depends(get_current_user)):
         "community_notifications": True,
     }
     return {**defaults, **(fresh.get("preferences") or {})}
+
+
+# ============================================================
+# IN-APP NOTIFICATIONS
+# ============================================================
+@api.get("/notifications")
+async def get_notifications(user=Depends(get_current_user), limit: int = 60):
+    items = await db.notifications.find(
+        {"user_id": user["id"]}, {"_id": 0}
+    ).sort("created_at", -1).to_list(min(limit, 100))
+    return {"notifications": items}
+
+
+@api.get("/notifications/unread-count")
+async def get_unread_count(user=Depends(get_current_user)):
+    count = await db.notifications.count_documents({"user_id": user["id"], "read": False})
+    return {"count": count}
+
+
+@api.post("/notifications/read-all")
+async def mark_all_notifications_read(user=Depends(get_current_user)):
+    await db.notifications.update_many(
+        {"user_id": user["id"], "read": False},
+        {"$set": {"read": True}},
+    )
+    return {"status": "ok"}
+
+
+@api.post("/notifications/{notif_id}/read")
+async def mark_notification_read(notif_id: str, user=Depends(get_current_user)):
+    await db.notifications.update_one(
+        {"id": notif_id, "user_id": user["id"]},
+        {"$set": {"read": True}},
+    )
+    return {"status": "ok"}
 
 
 # ============================================================
@@ -1105,6 +1163,7 @@ async def claim_shift(shift_id: str, user=Depends(get_current_user)):
     }
     await db.shifts.insert_one(new_shift)
     await send_push([user["id"]], {"title": "Shift Claimed", "message": f"You claimed {s['role']} on {s['start'][:10]}"})
+    await notif.save_inapp(db, [user["id"]], "Shift Claimed ✓", f"You claimed {s['role']} on {s['start'][:10]}.", category="shift")
     return {"status": "claimed", "shift_id": new_shift["id"]}
 
 
@@ -1131,6 +1190,7 @@ async def cancel_claim(shift_id: str, user=Depends(get_current_user)):
             }
             await db.shifts.insert_one(promoted)
             await send_push([next_uid], {"title": "Spot Available!", "message": f"You've been promoted from the waitlist for a {s['role']} shift on {s['start'][:10]}"})
+            await notif.save_inapp(db, [next_uid], "Waitlist Promoted 🎉", f"You got a spot for {s['role']} on {s['start'][:10]}.", category="shift")
     return {"status": "cancelled"}
 
 
@@ -1814,8 +1874,20 @@ async def admin_create_announcement(body: AdminCreateAnnouncementIn, admin=Depen
         "posted_at": iso(now_utc()), "read_by": [],
     }
     await db.announcements.insert_one(ann); ann.pop("_id", None)
-    guards = await db.users.find({"role": "employee"}, {"id": 1}).to_list(500)
-    await send_push([g["id"] for g in guards], {"title": body.title, "message": body.body[:120]})
+    guards = await db.users.find({"role": "employee"}, {"id": 1, "email": 1, "_id": 0}).to_list(500)
+    guard_ids = [g["id"] for g in guards]
+    await send_push(guard_ids, {"title": body.title, "message": body.body[:120]})
+    ann_html = notif.email_template(
+        body.title,
+        [body.body],
+        cta_text="View in App",
+        cta_link="skyhawksecurity://announcements",
+    )
+    await asyncio.gather(
+        *[notif.send_email(g["email"], f"[Skyhawk] {body.title}", ann_html, body.body) for g in guards if g.get("email")],
+        notif.save_inapp(db, guard_ids, body.title, body.body[:300], category="announcement"),
+        return_exceptions=True,
+    )
     return ann
 
 
@@ -1905,6 +1977,22 @@ async def admin_update_payroll(payroll_id: str, body: AdminUpdatePayrollIn, admi
     updated = await db.payroll.find_one({"id": payroll_id}, {"_id": 0})
     if updated and updated.get("status") == "released":
         await send_push([updated["user_id"]], {"title": "Payroll Released", "message": f"Pay for {updated.get('period_end','')[:10]} has been released."})
+        guard = await db.users.find_one({"id": updated["user_id"]}, {"_id": 0, "email": 1, "full_name": 1})
+        pay_html = notif.email_template(
+            "Your pay has been released",
+            [
+                f"Hi {guard.get('full_name', 'there') if guard else 'there'},",
+                f"Your pay for the period ending <strong>{updated.get('period_end','')[:10]}</strong> has been released.",
+                f"Net pay: <strong>${updated.get('net', 0):.2f}</strong> (Gross: ${updated.get('gross', 0):.2f})",
+            ],
+            cta_text="View Pay Stub",
+            cta_link="skyhawksecurity://wallet",
+        )
+        await asyncio.gather(
+            notif.send_email(guard["email"], "Your Skyhawk pay has been released", pay_html) if guard and guard.get("email") else asyncio.sleep(0),
+            notif.save_inapp(db, [updated["user_id"]], "Payroll Released 💰", f"Pay for {updated.get('period_end','')[:10]} released. Net: ${updated.get('net', 0):.2f}", category="payroll"),
+            return_exceptions=True,
+        )
     return updated
 
 
@@ -1985,11 +2073,35 @@ async def trigger_sos(body: SOSIn, user=Depends(get_current_user)):
         "audit_trail": [],
     }
     await db.incidents.insert_one(incident)
-    admin_ids = [u["id"] async for u in db.users.find({"role": "admin"}, {"id": 1, "_id": 0})]
+    admins = await db.users.find({"role": "admin"}, {"id": 1, "email": 1, "phone": 1, "_id": 0}).to_list(100)
+    admin_ids = [a["id"] for a in admins]
     await send_push(
         admin_ids,
         {"title": f"🆘 SOS — {user['full_name']}", "message": f"{body.message or 'Guard needs immediate assistance'} · {body.latitude:.4f},{body.longitude:.4f}"},
         idempotency_key=f"sos-{alert_id}",
+    )
+    # Email + SMS all admins — SOS is critical, use every channel
+    sos_html = notif.email_template(
+        f"🆘 SOS ALERT — {user['full_name']}",
+        [
+            f"<strong style='color:#EF4444'>EMERGENCY — Guard needs immediate assistance.</strong>",
+            f"<strong>Guard:</strong> {user['full_name']} (#{user.get('employee_number', 'N/A')})",
+            f"<strong>GPS:</strong> {body.latitude:.5f}, {body.longitude:.5f}",
+            f"<strong>Message:</strong> {body.message or 'No message provided'}",
+            f"<strong>Time:</strong> {iso(now)}",
+        ],
+    )
+    sms_body = (
+        f"🆘 SOS ALERT: {user['full_name']} needs help. "
+        f"GPS: {body.latitude:.4f},{body.longitude:.4f}. "
+        f"{body.message or 'Immediate assistance required.'}"
+    )
+    await asyncio.gather(
+        *[notif.send_email(a["email"], f"🆘 SOS ALERT — {user['full_name']}", sos_html) for a in admins if a.get("email")],
+        *[notif.send_sms(a["phone"], sms_body) for a in admins if a.get("phone")],
+        notif.save_inapp(db, admin_ids, f"🆘 SOS — {user['full_name']}", body.message or "Guard needs immediate assistance", category="sos"),
+        notif.save_inapp(db, [user["id"]], "SOS Alert Sent", "Your emergency alert has been sent to all managers.", category="sos"),
+        return_exceptions=True,
     )
     logger.warning("SOS triggered by user %s at %s,%s", user["id"], body.latitude, body.longitude)
     return alert
@@ -2063,10 +2175,12 @@ async def update_incident_status(inc_id: str, body: IncidentStatusIn, admin=Depe
     note_entry = {"ts": iso(now), "by": admin["full_name"], "status": body.status, "note": body.note}
     await db.incidents.update_one({"id": inc_id}, {"$set": update, "$push": {"audit_trail": note_entry}})
     if body.status == "resolved":
-        await send_push(
-            [inc["user_id"]],
-            {"title": "Incident Resolved", "message": f"Your {inc['type'].replace('_', ' ')} report has been resolved. {body.note or ''}".strip()},
-        )
+        msg = f"Your {inc['type'].replace('_', ' ')} report has been resolved. {body.note or ''}".strip()
+        await send_push([inc["user_id"]], {"title": "Incident Resolved", "message": msg})
+        await notif.save_inapp(db, [inc["user_id"]], "Incident Resolved ✓", msg, category="incident")
+    elif body.status in ("escalated", "under_review"):
+        label = "Escalated" if body.status == "escalated" else "Under Review"
+        await notif.save_inapp(db, [inc["user_id"]], f"Incident {label}", f"Your report is now {body.status.replace('_',' ')}. {body.note or ''}".strip(), category="incident")
     return await db.incidents.find_one({"id": inc_id}, {"_id": 0, "photos": 0, "signature_base64": 0})
 
 
@@ -2231,19 +2345,30 @@ async def admin_swap_decision(swap_id: str, body: SwapActionIn, admin=Depends(re
     swap = await db.shift_swaps.find_one({"id": swap_id, "status": "accepted"})
     if not swap:
         raise HTTPException(404, "Swap not found or not in 'accepted' state")
+    both_ids = [swap["requester_id"], swap["volunteer_id"]]
     if body.action == "approve":
         await db.shifts.update_one({"id": swap["shift_id"]}, {"$set": {"user_id": swap["volunteer_id"], "swapped_from": swap["requester_id"]}})
         await db.shift_swaps.update_one({"id": swap_id}, {"$set": {"status": "approved", "resolved_at": iso(now_utc()), "approved_by": admin["id"]}})
         await send_push(
-            [swap["requester_id"], swap["volunteer_id"]],
+            both_ids,
             {"title": "Shift Swap Approved ✓", "message": f"The {swap['start'][:10]} shift has been transferred to {swap['volunteer_name']}."},
+        )
+        # SMS both parties + in-app
+        req_user = await db.users.find_one({"id": swap["requester_id"]},  {"phone": 1, "_id": 0})
+        vol_user = await db.users.find_one({"id": swap["volunteer_id"]},  {"phone": 1, "_id": 0})
+        await asyncio.gather(
+            notif.send_sms(req_user["phone"], f"Skyhawk: Your swap request for {swap['start'][:10]} was APPROVED. You're now off this shift.") if req_user and req_user.get("phone") else asyncio.sleep(0),
+            notif.send_sms(vol_user["phone"], f"Skyhawk: Shift swap APPROVED — you're now working {swap['start'][:10]}.") if vol_user and vol_user.get("phone") else asyncio.sleep(0),
+            notif.save_inapp(db, both_ids, "Shift Swap Approved ✓", f"The {swap['start'][:10]} shift has been transferred to {swap['volunteer_name']}.", category="swap"),
+            return_exceptions=True,
         )
     else:
         await db.shift_swaps.update_one({"id": swap_id}, {"$set": {"status": "rejected", "resolved_at": iso(now_utc()), "rejected_by": admin["id"]}})
         await send_push(
-            [swap["requester_id"], swap["volunteer_id"]],
+            both_ids,
             {"title": "Shift Swap Rejected", "message": f"The swap request for {swap['start'][:10]} was not approved."},
         )
+        await notif.save_inapp(db, both_ids, "Shift Swap Rejected", f"The swap request for {swap['start'][:10]} was not approved.", category="swap")
     return {"action": body.action}
 
 

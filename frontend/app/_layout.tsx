@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider, useAuth } from "@/src/auth/AuthContext";
+import { NotificationsProvider } from "@/src/context/NotificationsContext";
 import { theme } from "@/src/theme";
 import { api, getToken } from "@/src/api/client";
 import { ErrorBoundary } from "@/src/components/ErrorBoundary";
@@ -123,8 +124,10 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.bg }}>
         <SafeAreaProvider>
           <AuthProvider>
-            <StatusBar style="light" />
-            <AuthGate />
+            <NotificationsProvider>
+              <StatusBar style="light" />
+              <AuthGate />
+            </NotificationsProvider>
           </AuthProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
