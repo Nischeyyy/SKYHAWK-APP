@@ -22,6 +22,9 @@ const C = {
   warningSoft: "rgba(199,119,0,0.12)",
   verified: "#2FAE59",
   bannerBg: "#E8F1FF",
+  black: "#111112",
+  green: "#2FAE59",
+  greenSoft: "#EAF6EE",
 };
 
 function Badge({ label, tone }: { label: string; tone: "accent" | "warning" }) {
@@ -152,9 +155,16 @@ export default function OpenShifts() {
                       <Text style={styles.outlineText}>On Waitlist · Leave</Text>
                     </Pressable>
                   ) : isTopPick ? (
-                    <Pressable testID={`claim-${s.id}`} onPress={() => claim(s.id)} style={styles.primaryBtn}>
-                      <Text style={styles.primaryText}>{spotsLeft > 0 ? "Claim Shift" : "Join Waitlist"}</Text>
-                      <Ionicons name="arrow-forward" size={16} color="#fff" />
+                    <Pressable
+                      testID={`claim-${s.id}`}
+                      onPress={() => claim(s.id)}
+                    >
+                      {({ pressed }) => (
+                        <View style={[styles.primaryBtn, pressed && styles.primaryBtnPressed]}>
+                          <Text style={styles.primaryText}>{spotsLeft > 0 ? "Claim Shift" : "Join Waitlist"}</Text>
+                          <Ionicons name="arrow-forward" size={16} color="#fff" />
+                        </View>
+                      )}
                     </Pressable>
                   ) : (
                     <Pressable testID={`claim-${s.id}`} onPress={() => claim(s.id)} style={styles.linkBtn}>
@@ -218,13 +228,16 @@ const styles = StyleSheet.create({
   itemMeta: { color: C.textSecondary, fontSize: 13, marginLeft: 4 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 7 },
   primaryBtn: {
-    backgroundColor: C.accent,
+    backgroundColor: C.black,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 6,
+  },
+  primaryBtnPressed: {
+    backgroundColor: C.green,
   },
   primaryText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   outlineBtn: {
