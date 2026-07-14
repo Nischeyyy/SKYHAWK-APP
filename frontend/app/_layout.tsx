@@ -50,9 +50,11 @@ function AuthGate() {
     const inAuthGroup = segments[0] === "(auth)";
     const inManagerGroup = segments[0] === "(manager)";
     const inTabsGroup = segments[0] === "(tabs)";
+    // Allow the register screen to complete its own multi-step flow before redirecting
+    const onRegisterScreen = segments[1] === "register";
     if (!user && !inAuthGroup) {
       router.replace("/(auth)/login");
-    } else if (user && inAuthGroup) {
+    } else if (user && inAuthGroup && !onRegisterScreen) {
       router.replace(user.role === "admin" ? "/(manager)" : "/(tabs)");
     } else if (user && user.role === "admin" && inTabsGroup) {
       router.replace("/(manager)");
