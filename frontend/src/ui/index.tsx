@@ -109,7 +109,7 @@ export function Avatar({ name, size = 40, testID }: { name?: string; size?: numb
   );
 }
 
-/** Skyhawk shield motif — small brand mark for headers */
+/** disptchr shield motif — small brand mark for headers */
 export function ShieldMark({ size = 22 }: { size?: number }) {
   return (
     <View

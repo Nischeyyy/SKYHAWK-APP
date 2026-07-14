@@ -198,7 +198,7 @@ export default function Payroll() {
               <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
                 {/* Header */}
                 <View style={styles.stubHeader}>
-                  <Text style={styles.stubCompany}>Skyhawk Security Operations</Text>
+                  <Text style={styles.stubCompany}>disptchr</Text>
                   <Text style={styles.stubPeriod}>
                     Period: {new Date(stubPeriod.period_start).toLocaleDateString()} –{" "}
                     {new Date(stubPeriod.period_end).toLocaleDateString()}

@@ -318,8 +318,8 @@ export default function Register() {
               </View>
             </View>
 
-            <Text style={s.welcomeTitle}>Skyhawk</Text>
-            <Text style={s.welcomeSub}>Security Operations</Text>
+            <Text style={s.welcomeTitle}>disptchr</Text>
+            <Text style={s.welcomeSub}>Built for Security Companies</Text>
             <Text style={s.welcomeTagline}>
               The all-in-one platform designed to simplify your work and keep
               you connected.

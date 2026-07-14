@@ -115,7 +115,7 @@ export default function Wallet() {
         <View style={styles.idCard} testID="id-card">
           <View style={styles.idHeader}>
             <View>
-              <Text style={styles.idBrand}>Skyhawk</Text>
+              <Text style={styles.idBrand}>disptchr</Text>
               <Text style={styles.idBrandSub}>Employee ID</Text>
             </View>
             <Text style={styles.idNumber}>{emp.employee_number}</Text>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable } from "react-native";
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pressable, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { theme } from "@/src/theme";
@@ -32,8 +32,16 @@ export default function Login() {
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <View style={styles.brandWrap}>
-            <Text style={styles.brand}>Skyhawk</Text>
-            <Text style={styles.brandSub}>Security Operations</Text>
+            {/* Logo mark — clip to top half (white-on-dark variant) */}
+            <View style={styles.logoClip}>
+              <Image
+                source={require("../../assets/images/disptchr-logo.png")}
+                style={styles.logoImg}
+                resizeMode="cover"
+              />
+            </View>
+            <Text style={styles.brand}>disptchr</Text>
+            <Text style={styles.brandSub}>Built for Security Companies</Text>
           </View>
 
           {sessionExpired && (
@@ -87,8 +95,10 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   container: { padding: 24, paddingTop: 60 },
   brandWrap: { alignItems: "center", marginBottom: 60 },
-  brand: { color: theme.colors.text, fontSize: 34, fontWeight: "700", letterSpacing: -0.5 },
-  brandSub: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 4 },
+  logoClip: { width: 260, height: 87, overflow: "hidden", marginBottom: 16 },
+  logoImg: { width: 260, height: 173 },
+  brand: { color: theme.colors.text, fontSize: 32, fontWeight: "700", letterSpacing: -1, fontFamily: Platform.OS === "ios" ? "System" : "sans-serif" },
+  brandSub: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 4, letterSpacing: 2, textTransform: "uppercase" },
   form: {},
   label: { color: theme.colors.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6, marginTop: 14 },
   input: {
