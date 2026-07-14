@@ -1,0 +1,208 @@
+1. The logo is too large and repeated
+
+You have:
+
+Eagle icon
+Small logo
+Large "disptchr"
+Tagline
+
+That's effectively the brand shown four times.
+
+Apple would do one of these:
+
+Option A (my recommendation)
+
+[eagle]
+
+disptchr
+Built for Security Companies
+
+or
+
+Option B
+
+disptchr
+
+Sign in
+
+Nothing more.
+
+2. Too much empty space
+
+There's a huge gap between the logo and the form.
+
+Apple usually groups related elements.
+
+Logo
+
+Sign In
+
+Email
+
+Password
+
+Button
+
+Everything feels connected.
+
+3. The blue button
+
+This immediately breaks the aesthetic.
+
+Everything else is monochrome.
+
+Then suddenly:
+
+🔵 Blue.
+
+Either:
+
+Use the native iOS blue throughout the app, or
+Commit to monochrome.
+
+Since the rest of your app is black and white, I'd make it:
+
+White button
+Black text
+
+Exactly like Apple Wallet.
+
+4. Input fields
+
+These look like generic React Native text fields.
+
+I'd use native iOS styling.
+
+Instead of
+
+EMAIL
+────────────
+
+use
+
+Email
+
+guard@skyhawk.com
+
+No uppercase labels.
+
+Apple rarely uses uppercase labels for login forms.
+
+5. "New guard? Start Onboarding"
+
+This looks like an afterthought.
+
+Instead make it feel like part of the flow.
+
+Don't have an account?
+
+Start Onboarding →
+
+or simply
+
+Create Employee Account →
+6. Demo credentials
+
+These should never appear on a production login screen.
+
+Guard:
+Manager:
+Password123
+
+If these are for testing, hide them behind a developer mode or remove them entirely.
+
+7. Forgot Password
+
+Missing.
+
+It should be directly under Password.
+
+Forgot Password?
+
+Simple.
+
+8. Face ID
+
+Since you're targeting iOS, after the first login the screen should become:
+
+disptchr
+
+Welcome back
+
+Marcus
+
+[Face ID icon]
+
+Sign in with Face ID
+
+Very Apple.
+
+9. Typography
+
+I'd reduce the logo size by about 20–25%.
+
+Right now the logo competes with the login form.
+
+Apple tends to let the action (signing in) dominate the screen.
+
+10. Status bar
+
+You still have
+
+< Camera
+
+which means this is a screenshot from the Camera app.
+
+For polished marketing shots or mockups, crop or use simulator screenshots.
+
+11. Missing context
+
+The screen goes straight into email/password.
+
+I'd add one line.
+
+Sign in
+
+Access your shifts, payroll and credentials.
+
+Then the form.
+
+It immediately tells the user why they're here.
+
+Overall structure I'd use
+        [Logo]
+
+      disptchr
+
+Access your shifts,
+payroll and credentials.
+
+
+Email
+
+_____________
+
+Password
+
+_____________
+
+Forgot Password?
+
+
+[ Sign In ]
+
+
+──────────────
+
+Don't have an account?
+
+Start Onboarding →
+
+No tagline.
+
+No demo credentials.
+
+No extra branding.
+
+Just one clear path.
