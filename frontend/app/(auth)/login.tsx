@@ -12,8 +12,18 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { theme } from "@/src/theme";
 import { useAuth } from "@/src/auth/AuthContext";
+
+// ── Light-theme palette (auth screens only) ───────────────────────────────────
+const W = {
+  bg: "#FFFFFF",
+  input: "#F2F2F7",
+  border: "#E5E5EA",
+  text: "#000000",
+  textSecondary: "#6C6C70",
+  textTertiary: "#AEAEB2",
+  danger: "#FF3B30",
+};
 
 export default function Login() {
   const { login, sessionExpired, clearSessionExpired } = useAuth();
@@ -48,13 +58,11 @@ export default function Login() {
         >
           {/* ── Brand ── */}
           <View style={styles.brandWrap}>
-            <View style={styles.markContainer}>
-              <Image
-                source={require("../../assets/images/disptchr-mark.png")}
-                style={styles.markImage}
-                resizeMode="contain"
-              />
-            </View>
+            <Image
+              source={require("../../assets/images/disptchr-hawk.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <Text style={styles.wordmark}>disptchr</Text>
           </View>
 
@@ -84,7 +92,7 @@ export default function Login() {
                 autoComplete="email"
                 keyboardType="email-address"
                 placeholder="you@example.com"
-                placeholderTextColor={theme.colors.textTertiary}
+                placeholderTextColor={W.textTertiary}
                 style={styles.input}
               />
             </View>
@@ -97,7 +105,7 @@ export default function Login() {
                 onChangeText={setPassword}
                 secureTextEntry
                 placeholder="••••••••"
-                placeholderTextColor={theme.colors.textTertiary}
+                placeholderTextColor={W.textTertiary}
                 style={styles.input}
               />
               <Pressable style={styles.forgotWrap} onPress={() => {}}>
@@ -108,7 +116,7 @@ export default function Login() {
             {error && <Text style={styles.error}>{error}</Text>}
           </View>
 
-          {/* ── Sign In button — white / monochrome ── */}
+          {/* ── Sign In button ── */}
           <Pressable
             testID="login-submit-button"
             onPress={submit}
@@ -142,32 +150,23 @@ export default function Login() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
-  container: { paddingHorizontal: 28, paddingTop: 64, paddingBottom: 48 },
+  safe: { flex: 1, backgroundColor: W.bg },
+  container: { paddingHorizontal: 28, paddingTop: 56, paddingBottom: 48 },
 
   // Brand
-  brandWrap: { alignItems: "center", marginBottom: 20 },
-  markContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  markImage: { width: 58, height: 58 },
+  brandWrap: { alignItems: "center", marginBottom: 18 },
+  logo: { width: 120, height: 120 },
   wordmark: {
-    color: theme.colors.text,
-    fontSize: 30,
+    color: W.text,
+    fontSize: 32,
     fontWeight: "700",
     letterSpacing: -0.8,
+    marginTop: 8,
   },
 
   // Context
   context: {
-    color: theme.colors.textSecondary,
+    color: W.textSecondary,
     fontSize: 15,
     textAlign: "center",
     lineHeight: 22,
@@ -177,61 +176,64 @@ const styles = StyleSheet.create({
 
   // Session banner
   sessionBanner: {
-    backgroundColor: "rgba(255,69,58,0.12)",
+    backgroundColor: "rgba(255,59,48,0.08)",
     borderRadius: 10,
     padding: 12,
     marginBottom: 20,
     borderLeftWidth: 3,
-    borderLeftColor: theme.colors.danger,
+    borderLeftColor: W.danger,
   },
-  sessionText: { color: theme.colors.danger, fontSize: 13, textAlign: "center" },
+  sessionText: { color: W.danger, fontSize: 13, textAlign: "center" },
 
   // Form
   form: { gap: 8, marginBottom: 28 },
   fieldGroup: { gap: 0 },
   label: {
-    color: theme.colors.textSecondary,
+    color: W.textSecondary,
     fontSize: 14,
+    fontWeight: "500",
     marginBottom: 6,
     marginTop: 14,
   },
   input: {
-    backgroundColor: theme.colors.card,
-    color: theme.colors.text,
-    borderRadius: theme.radius.lg,
+    backgroundColor: W.input,
+    color: W.text,
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 15,
     fontSize: 16,
+    borderWidth: 1,
+    borderColor: W.border,
   },
   forgotWrap: { alignSelf: "flex-end", marginTop: 10 },
-  forgotText: { color: theme.colors.textSecondary, fontSize: 13 },
+  forgotText: { color: W.textSecondary, fontSize: 13 },
   error: {
-    color: theme.colors.error,
+    color: W.danger,
     fontSize: 13,
     marginTop: 8,
     textAlign: "center",
   },
 
-  // Sign In button — white, monochrome
+  // Sign In button — black, monochrome
   signInBtn: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: theme.radius.lg,
+    backgroundColor: "#000000",
+    borderRadius: 14,
     height: 56,
     alignItems: "center",
     justifyContent: "center",
   },
-  signInBtnDisabled: { backgroundColor: "rgba(255,255,255,0.25)" },
+  signInBtnDisabled: { backgroundColor: "#D1D1D6" },
   signInBtnPressed: { opacity: 0.88 },
-  signInLabel: { color: "#000000", fontSize: 16, fontWeight: "600" },
+  signInLabel: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
 
   // Footer
   footer: { alignItems: "center", marginTop: 48, gap: 10 },
   divider: {
     width: 48,
     height: 1,
-    backgroundColor: theme.colors.divider,
+    backgroundColor: W.border,
     marginBottom: 6,
   },
-  footerLabel: { color: theme.colors.textTertiary, fontSize: 13 },
-  footerLink: { color: theme.colors.text, fontSize: 14, fontWeight: "500" },
+  footerLabel: { color: W.textTertiary, fontSize: 13 },
+  footerLink: { color: W.text, fontSize: 14, fontWeight: "500" },
 });

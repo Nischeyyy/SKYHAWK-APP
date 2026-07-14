@@ -10,13 +10,27 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { theme } from "@/src/theme";
 import { useAuth } from "@/src/auth/AuthContext";
+
+// ── Light-theme palette (auth screens only) ───────────────────────────────────
+const W = {
+  bg: "#FFFFFF",
+  card: "#F2F2F7",
+  cardElevated: "#E8E8ED",
+  border: "#E5E5EA",
+  text: "#000000",
+  textSecondary: "#6C6C70",
+  textTertiary: "#AEAEB2",
+  accent: "#0A84FF",
+  verified: "#30D158",
+  danger: "#FF3B30",
+};
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -84,14 +98,14 @@ function IconInput({
       <Ionicons
         name={icon}
         size={17}
-        color={focused ? theme.colors.textSecondary : theme.colors.textTertiary}
+        color={focused ? W.textSecondary : W.textTertiary}
         style={{ width: 22 }}
       />
       <TextInput
         ref={inputRef}
         style={iStyles.input}
         placeholder={placeholder}
-        placeholderTextColor={theme.colors.textTertiary}
+        placeholderTextColor={W.textTertiary}
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={secureTextEntry}
@@ -101,7 +115,7 @@ function IconInput({
         autoCorrect={false}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        selectionColor={theme.colors.accent}
+        selectionColor={W.accent}
         returnKeyType={returnKeyType}
         onSubmitEditing={onSubmitEditing}
       />
@@ -116,7 +130,7 @@ function ValidationRow({ pass, label }: { pass: boolean; label: string }) {
       <View style={[vStyles.circle, pass && vStyles.circleDone]}>
         {pass && <Ionicons name="checkmark" size={9} color="#fff" />}
       </View>
-      <Text style={[vStyles.label, pass && { color: theme.colors.textSecondary }]}>
+      <Text style={[vStyles.label, pass && { color: W.textSecondary }]}>
         {label}
       </Text>
     </View>
@@ -311,13 +325,11 @@ export default function Register() {
       return (
         <View style={s.welcomeWrap}>
           <View style={s.welcomeCenter}>
-            {/* Shield mark */}
-            <View style={s.shieldOuter}>
-              <View style={s.shield}>
-                <View style={s.shieldInner} />
-              </View>
-            </View>
-
+            <Image
+              source={require("../../assets/images/disptchr-hawk.png")}
+              style={s.welcomeLogo}
+              resizeMode="contain"
+            />
             <Text style={s.welcomeTitle}>disptchr</Text>
             <Text style={s.welcomeSub}>Built for Security Companies</Text>
             <Text style={s.welcomeTagline}>
@@ -342,7 +354,7 @@ export default function Register() {
             >
               <Text style={s.signInLinkText}>
                 Already have an account?{" "}
-                <Text style={{ color: theme.colors.accent }}>Sign In</Text>
+                <Text style={{ color: W.accent }}>Sign In</Text>
               </Text>
             </Pressable>
           </View>
@@ -417,7 +429,7 @@ export default function Register() {
                     <Ionicons
                       name={showPw ? "eye-off-outline" : "eye-outline"}
                       size={18}
-                      color={theme.colors.textTertiary}
+                      color={W.textTertiary}
                     />
                   </Pressable>
                 }
@@ -472,7 +484,7 @@ export default function Register() {
           <Text style={s.stepTitle}>Verify your phone</Text>
           <Text style={s.stepSub}>
             Enter the 6-digit code we sent to{"\n"}
-            <Text style={{ color: theme.colors.text, fontWeight: "600" }}>
+            <Text style={{ color: W.text, fontWeight: "600" }}>
               {phone || "+1 416 555 0142"}
             </Text>
           </Text>
@@ -490,7 +502,7 @@ export default function Register() {
                 keyboardType="number-pad"
                 maxLength={1}
                 textAlign="center"
-                selectionColor={theme.colors.accent}
+                selectionColor={W.accent}
                 accessibilityLabel={`Digit ${i + 1}`}
               />
             ))}
@@ -508,7 +520,7 @@ export default function Register() {
                 onPress={() => setResend(28)}
                 accessibilityRole="button"
               >
-                <Text style={[s.resendTimer, { color: theme.colors.accent }]}>
+                <Text style={[s.resendTimer, { color: W.accent }]}>
                   Resend
                 </Text>
               </Pressable>
@@ -574,7 +586,7 @@ export default function Register() {
                     <Ionicons
                       name={r.icon}
                       size={17}
-                      color={selected ? theme.colors.accent : theme.colors.textSecondary}
+                      color={selected ? W.accent : W.textSecondary}
                     />
                   </View>
                   {/* Text */}
@@ -582,7 +594,7 @@ export default function Register() {
                     <Text
                       style={[
                         s.roleLabel,
-                        selected && { color: theme.colors.text },
+                        selected && { color: W.text },
                       ]}
                     >
                       {r.label}
@@ -608,9 +620,9 @@ export default function Register() {
             </View>
             <Text style={s.termsText}>
               I have read and agree to the{" "}
-              <Text style={{ color: theme.colors.accent }}>Terms of Service</Text>
+              <Text style={{ color: W.accent }}>Terms of Service</Text>
               {" "}and{" "}
-              <Text style={{ color: theme.colors.accent }}>Privacy Policy</Text>
+              <Text style={{ color: W.accent }}>Privacy Policy</Text>
               .
             </Text>
           </Pressable>
@@ -690,7 +702,7 @@ export default function Register() {
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
+          <Ionicons name="chevron-back" size={26} color={W.text} />
         </Pressable>
       )}
 
@@ -713,7 +725,7 @@ export default function Register() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  safe: { flex: 1, backgroundColor: W.bg },
 
   backBtn: {
     position: "absolute",
@@ -740,40 +752,26 @@ const s = StyleSheet.create({
     justifyContent: "center",
     paddingBottom: 24,
   },
-  shieldOuter: { marginBottom: 36 },
-  shield: {
-    width: 68,
-    height: 80,
-    borderWidth: 2.5,
-    borderColor: theme.colors.accent,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  shieldInner: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: theme.colors.accent,
+  welcomeLogo: {
+    width: 130,
+    height: 130,
+    marginBottom: 28,
   },
   welcomeTitle: {
-    color: theme.colors.text,
+    color: W.text,
     fontSize: 42,
     fontWeight: "700",
     letterSpacing: -1.5,
     marginBottom: 6,
   },
   welcomeSub: {
-    color: theme.colors.textSecondary,
+    color: W.textSecondary,
     fontSize: 16,
     marginBottom: 24,
     letterSpacing: 0.1,
   },
   welcomeTagline: {
-    color: theme.colors.textTertiary,
+    color: W.textTertiary,
     fontSize: 15,
     textAlign: "center",
     lineHeight: 23,
@@ -788,7 +786,7 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   signInLinkText: {
-    color: theme.colors.textSecondary,
+    color: W.textSecondary,
     fontSize: 15,
   },
 
@@ -809,27 +807,27 @@ const s = StyleSheet.create({
     height: 4,
     width: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(0,0,0,0.10)",
   },
   dotDone: {
-    backgroundColor: "rgba(255,255,255,0.28)",
+    backgroundColor: "rgba(0,0,0,0.22)",
   },
   dotActive: {
     width: 22,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: W.accent,
     borderRadius: 2,
   },
 
   // ── Step titles ───────────────────────────────────────────────────────────
   stepTitle: {
-    color: theme.colors.text,
+    color: W.text,
     fontSize: 28,
     fontWeight: "700",
     letterSpacing: -0.6,
     marginTop: 22,
   },
   stepSub: {
-    color: theme.colors.textSecondary,
+    color: W.textSecondary,
     fontSize: 15,
     marginTop: 7,
     lineHeight: 22,
@@ -837,13 +835,13 @@ const s = StyleSheet.create({
 
   // ── Primary button ────────────────────────────────────────────────────────
   primaryBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: theme.radius.xl,
+    backgroundColor: "#000000",
+    borderRadius: 14,
     height: 56,
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryBtnDisabled: { opacity: 0.32 },
+  primaryBtnDisabled: { opacity: 0.28 },
   primaryBtnLabel: {
     color: "#fff",
     fontSize: 17,
@@ -858,13 +856,13 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   skipBtnText: {
-    color: theme.colors.textSecondary,
+    color: W.textSecondary,
     fontSize: 15,
   },
 
   // ── Error ─────────────────────────────────────────────────────────────────
   error: {
-    color: theme.colors.danger,
+    color: W.danger,
     fontSize: 13,
     marginTop: 14,
     textAlign: "center",
@@ -881,17 +879,17 @@ const s = StyleSheet.create({
   otpBox: {
     width: 46,
     height: 58,
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.md,
+    backgroundColor: W.card,
+    borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: "transparent",
-    color: theme.colors.text,
+    borderColor: W.border,
+    color: W.text,
     fontSize: 24,
     fontWeight: "700",
   },
   otpBoxFilled: {
-    borderColor: theme.colors.accent,
-    backgroundColor: "rgba(10,132,255,0.07)",
+    borderColor: W.accent,
+    backgroundColor: "rgba(10,132,255,0.06)",
   },
 
   // ── Resend ────────────────────────────────────────────────────────────────
@@ -902,11 +900,11 @@ const s = StyleSheet.create({
     marginTop: 22,
   },
   resendText: {
-    color: theme.colors.textTertiary,
+    color: W.textTertiary,
     fontSize: 14,
   },
   resendTimer: {
-    color: theme.colors.textSecondary,
+    color: W.textSecondary,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -915,15 +913,15 @@ const s = StyleSheet.create({
   roleCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
+    backgroundColor: W.card,
+    borderRadius: 14,
     padding: 16,
     gap: 12,
     borderWidth: 1.5,
-    borderColor: "transparent",
+    borderColor: W.border,
   },
   roleCardSelected: {
-    borderColor: theme.colors.accent,
+    borderColor: W.accent,
     backgroundColor: "rgba(10,132,255,0.05)",
   },
   radio: {
@@ -931,37 +929,37 @@ const s = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: theme.colors.border,
+    borderColor: W.border,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
-  radioSelected: { borderColor: theme.colors.accent },
+  radioSelected: { borderColor: W.accent },
   radioDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: W.accent,
   },
   roleIcon: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: theme.colors.cardElevated,
+    backgroundColor: W.cardElevated,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   roleIconSelected: {
-    backgroundColor: "rgba(10,132,255,0.12)",
+    backgroundColor: "rgba(10,132,255,0.10)",
   },
   roleLabel: {
-    color: theme.colors.textSecondary,
+    color: W.textSecondary,
     fontSize: 15,
     fontWeight: "600",
   },
   roleDesc: {
-    color: theme.colors.textTertiary,
+    color: W.textTertiary,
     fontSize: 13,
     marginTop: 2,
     lineHeight: 18,
@@ -979,18 +977,18 @@ const s = StyleSheet.create({
     height: 20,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: theme.colors.border,
+    borderColor: W.border,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 1,
     flexShrink: 0,
   },
   checkboxChecked: {
-    backgroundColor: theme.colors.accent,
-    borderColor: theme.colors.accent,
+    backgroundColor: W.accent,
+    borderColor: W.accent,
   },
   termsText: {
-    color: theme.colors.textSecondary,
+    color: W.textSecondary,
     fontSize: 14,
     lineHeight: 20,
     flex: 1,
@@ -1008,19 +1006,18 @@ const s = StyleSheet.create({
     width: 104,
     height: 104,
     borderRadius: 52,
-    backgroundColor: theme.colors.verified,
+    backgroundColor: W.verified,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 36,
-    // Glow
-    shadowColor: theme.colors.verified,
+    shadowColor: W.verified,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
+    shadowOpacity: 0.35,
     shadowRadius: 30,
     elevation: 14,
   },
   allSetTitle: {
-    color: theme.colors.text,
+    color: W.text,
     fontSize: 34,
     fontWeight: "700",
     letterSpacing: -0.8,
@@ -1028,7 +1025,7 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   allSetSub: {
-    color: theme.colors.textSecondary,
+    color: W.textSecondary,
     fontSize: 16,
     textAlign: "center",
     lineHeight: 24,
@@ -1045,21 +1042,21 @@ const iStyles = StyleSheet.create({
   wrap: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
+    backgroundColor: W.card,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: "transparent",
+    borderColor: W.border,
     height: 56,
     paddingHorizontal: 16,
     gap: 10,
   },
   wrapFocused: {
-    borderColor: "rgba(10,132,255,0.45)",
+    borderColor: "rgba(10,132,255,0.50)",
     backgroundColor: "rgba(10,132,255,0.03)",
   },
   input: {
     flex: 1,
-    color: theme.colors.text,
+    color: W.text,
     fontSize: 16,
     height: "100%",
   },
@@ -1078,16 +1075,16 @@ const vStyles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: W.border,
     alignItems: "center",
     justifyContent: "center",
   },
   circleDone: {
-    backgroundColor: theme.colors.verified,
-    borderColor: theme.colors.verified,
+    backgroundColor: W.verified,
+    borderColor: W.verified,
   },
   label: {
-    color: theme.colors.textTertiary,
+    color: W.textTertiary,
     fontSize: 13,
   },
 });

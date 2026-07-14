@@ -3,8 +3,18 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { theme } from "@/src/theme";
 import { api } from "@/src/api/client";
+
+const W = {
+  bg: "#FFFFFF",
+  card: "#F2F2F7",
+  border: "#E5E5EA",
+  text: "#000000",
+  textSecondary: "#6C6C70",
+  textTertiary: "#AEAEB2",
+  accent: "#0A84FF",
+  verified: "#30D158",
+};
 
 const STEPS = [
   { key: "documents_uploaded", label: "Upload ID Documents" },
@@ -29,7 +39,11 @@ export default function Onboarding() {
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  if (loading) return <SafeAreaView style={styles.safe}><ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} /></SafeAreaView>;
+  if (loading) return (
+    <SafeAreaView style={styles.safe}>
+      <ActivityIndicator color={W.textSecondary} style={{ marginTop: 40 }} />
+    </SafeAreaView>
+  );
 
   const status = data?.status || {};
   const pct = data?.percent || 0;
@@ -38,7 +52,7 @@ export default function Onboarding() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }}>
-          <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
+          <Ionicons name="chevron-back" size={26} color={W.text} />
         </Pressable>
         <Text style={styles.title}>Onboarding</Text>
       </View>
@@ -49,7 +63,7 @@ export default function Onboarding() {
             <Text style={styles.steps}>{data?.completed} of {data?.total} steps</Text>
           </View>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${pct}%` }]} />
+            <View style={[styles.progressFill, { width: `${pct}%` as any }]} />
           </View>
         </View>
 
@@ -59,7 +73,7 @@ export default function Onboarding() {
             return (
               <View key={s.key} testID={`step-${s.key}`} style={[styles.stepRow, i < STEPS.length - 1 && styles.stepRowBorder]}>
                 <View style={[styles.check, done && styles.checkDone]}>
-                  {done && <Ionicons name="checkmark" size={13} color={theme.colors.bg} />}
+                  {done && <Ionicons name="checkmark" size={13} color="#fff" />}
                 </View>
                 <Text style={[styles.stepText, done && styles.stepTextDone]}>{s.label}</Text>
               </View>
@@ -72,20 +86,20 @@ export default function Onboarding() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  safe: { flex: 1, backgroundColor: W.bg },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
-  title: { color: theme.colors.text, fontSize: 20, fontWeight: "600" },
+  title: { color: W.text, fontSize: 20, fontWeight: "600" },
   progressWrap: { paddingVertical: 20 },
   progressHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 },
-  percent: { color: theme.colors.text, fontSize: 40, fontWeight: "700", letterSpacing: -1 },
-  steps: { color: theme.colors.textSecondary, fontSize: 14 },
-  progressBar: { height: 4, backgroundColor: theme.colors.card, borderRadius: 2, overflow: "hidden" },
-  progressFill: { height: "100%", backgroundColor: theme.colors.text },
-  stepsList: { backgroundColor: theme.colors.card, borderRadius: theme.radius.md, paddingHorizontal: 16, marginTop: 20 },
+  percent: { color: W.text, fontSize: 40, fontWeight: "700", letterSpacing: -1 },
+  steps: { color: W.textSecondary, fontSize: 14 },
+  progressBar: { height: 4, backgroundColor: W.card, borderRadius: 2, overflow: "hidden" },
+  progressFill: { height: "100%", backgroundColor: W.text },
+  stepsList: { backgroundColor: W.card, borderRadius: 10, paddingHorizontal: 16, marginTop: 20 },
   stepRow: { flexDirection: "row", alignItems: "center", paddingVertical: 14 },
-  stepRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
-  check: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, alignItems: "center", justifyContent: "center", marginRight: 14 },
-  checkDone: { backgroundColor: theme.colors.text, borderColor: theme.colors.text },
-  stepText: { color: theme.colors.textSecondary, fontSize: 15 },
-  stepTextDone: { color: theme.colors.text },
+  stepRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: W.border },
+  check: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: W.border, alignItems: "center", justifyContent: "center", marginRight: 14 },
+  checkDone: { backgroundColor: W.text, borderColor: W.text },
+  stepText: { color: W.textSecondary, fontSize: 15 },
+  stepTextDone: { color: W.text, fontWeight: "500" },
 });
