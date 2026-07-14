@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from "react-native";
+import React, { useCallback, useState, useRef } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl, Animated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -142,35 +142,65 @@ export default function OpenShifts() {
                   <Text style={styles.itemMeta}>{s.role} · {hrs}h · {spotsLeft} spot{spotsLeft !== 1 ? "s" : ""}</Text>
                 </View>
 
-                <View style={{ marginTop: 14 }}>
-                  {claiming === s.id ? (
-                    <ActivityIndicator color={C.accent} size="small" />
+                <View style={styles.claimWrap}>
+                  {waitlisted ? (
+                    <View>
+                      <Pressable testID={`leave-waitlist-${s.id}`} onPress={() => cancel(s.id)} disabled={claiming === s.id} style={styles.primaryBtn}>
+                        {claiming === s.id ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Text style={styles.primaryText}>On Waitlist · Leave</Text>
+                        )}
+                      </Pressable>
+                    </View>
                   ) : claimed ? (
-                    <Pressable testID={`cancel-claim-${s.id}`} onPress={() => cancel(s.id)} style={styles.claimedBtn}>
-                      <Ionicons name="checkmark-circle" size={16} color={C.verified} />
-                      <Text style={styles.claimedText}>Claimed · Tap to Cancel</Text>
-                    </Pressable>
-                  ) : waitlisted ? (
-                    <Pressable testID={`leave-waitlist-${s.id}`} onPress={() => cancel(s.id)} style={styles.outlineBtn}>
-                      <Text style={styles.outlineText}>On Waitlist · Leave</Text>
-                    </Pressable>
+                    <View>
+                      <Pressable testID={`cancel-claim-${s.id}`} onPress={() => cancel(s.id)} disabled={claiming === s.id} style={[styles.primaryBtn, styles.successBtn]}>
+                        {claiming === s.id ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <>
+                            <Ionicons name="checkmark" size={18} color="#fff" />
+                            <Text style={styles.primaryText}>Claimed</Text>
+                          </>
+                        )}
+                      </Pressable>
+                      <Pressable onPress={() => cancel(s.id)} disabled={claiming === s.id} style={styles.cancelLink}>
+                        <Text style={styles.cancelLinkText}>Cancel claim</Text>
+                      </Pressable>
+                    </View>
                   ) : isTopPick ? (
                     <Pressable
                       testID={`claim-${s.id}`}
                       onPress={() => claim(s.id)}
+                      disabled={claiming === s.id}
                     >
                       {({ pressed }) => (
-                        <View style={[styles.primaryBtn, pressed && styles.primaryBtnPressed]}>
-                          <Text style={styles.primaryText}>{spotsLeft > 0 ? "Claim Shift" : "Join Waitlist"}</Text>
-                          <Ionicons name="arrow-forward" size={16} color="#fff" />
+                        <View style={[styles.primaryBtn, pressed && !claiming && styles.primaryBtnPressed]}>
+                          {claiming === s.id ? (
+                            <ActivityIndicator color="#fff" size="small" />
+                          ) : (
+                            <>
+                              <Text style={styles.primaryText}>{spotsLeft > 0 ? "Claim Shift" : "Join Waitlist"}</Text>
+                              <Ionicons name="arrow-forward" size={16} color="#fff" />
+                            </>
+                          )}
                         </View>
                       )}
                     </Pressable>
                   ) : (
-                    <Pressable testID={`claim-${s.id}`} onPress={() => claim(s.id)} style={styles.linkBtn}>
-                      <Text style={styles.linkText}>{spotsLeft > 0 ? "Claim" : "Join Waitlist"}</Text>
-                      <Ionicons name="arrow-forward" size={14} color={C.accent} />
-                    </Pressable>
+                    <View>
+                      <Pressable testID={`claim-${s.id}`} onPress={() => claim(s.id)} disabled={claiming === s.id} style={styles.primaryBtn}>
+                        {claiming === s.id ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <>
+                            <Text style={styles.primaryText}>{spotsLeft > 0 ? "Claim" : "Join Waitlist"}</Text>
+                            <Ionicons name="arrow-forward" size={16} color="#fff" />
+                          </>
+                        )}
+                      </Pressable>
+                    </View>
                   )}
                 </View>
               </View>
@@ -230,7 +260,7 @@ const styles = StyleSheet.create({
   primaryBtn: {
     backgroundColor: C.black,
     borderRadius: 14,
-    paddingVertical: 14,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
@@ -239,19 +269,17 @@ const styles = StyleSheet.create({
   primaryBtnPressed: {
     backgroundColor: C.green,
   },
-  primaryText: { color: "#fff", fontSize: 15, fontWeight: "600" },
-  outlineBtn: {
-    borderColor: C.border,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: "center",
+  successBtn: {
+    backgroundColor: C.green,
   },
-  outlineText: { color: C.text, fontSize: 14 },
-  linkBtn: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
-  linkText: { color: C.accent, fontSize: 14, fontWeight: "600" },
-  claimedBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8 },
-  claimedText: { color: C.textSecondary, fontSize: 13 },
+  primaryText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  cancelLink: {
+    alignItems: "center",
+    paddingVertical: 10,
+    marginTop: 2,
+  },
+  cancelLinkText: { color: C.textSecondary, fontSize: 13, fontWeight: "500" },
+  claimWrap: { marginTop: 14, width: "100%" },
   empty: { color: C.textSecondary, textAlign: "center", marginTop: 60, fontSize: 15 },
   banner: {
     flexDirection: "row", alignItems: "center", gap: 12,
