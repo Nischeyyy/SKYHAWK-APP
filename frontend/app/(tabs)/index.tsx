@@ -4,8 +4,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-import { BlurView } from "expo-blur";
-import { LinearGradient } from "expo-linear-gradient";
 import { Avatar } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
@@ -231,25 +229,23 @@ export default function Dashboard() {
             <QuickAction
               testID="sos-btn"
               label="Emergency"
-              sub="Need immediate help"
-              danger
+              sub="Request help"
               onPress={() => { tap(); setSosOpen(true); }}
-              icon={<Ionicons name="shield-outline" size={24} color="#fff" />}
+              icon={<Ionicons name="shield-outline" size={22} color={light.text} />}
             />
             <QuickAction
               testID="call-dispatch-btn"
               label="Dispatch"
               sub="Call dispatch"
-              tone="green"
               onPress={() => { tap(); Linking.openURL(`tel:${dispatchNumber}`); }}
-              icon={<Ionicons name="radio-outline" size={24} color="#fff" />}
+              icon={<Ionicons name="radio-outline" size={22} color={light.text} />}
             />
             <QuickAction
               testID="create-report-btn"
               label="Report"
               sub="Submit a report"
               onPress={() => { tap(); router.push("/incidents"); }}
-              icon={<Ionicons name="document-text-outline" size={24} color={light.text} />}
+              icon={<Ionicons name="document-text-outline" size={22} color={light.text} />}
             />
           </View>
 
@@ -353,40 +349,17 @@ export default function Dashboard() {
   );
 }
 
-function QuickAction({ icon, label, sub, onPress, danger, tone, testID }: any) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const green = tone === "green";
+function QuickAction({ icon, label, sub, onPress, testID }: any) {
   return (
-    <Animated.View style={{ flex: 1, transform: [{ scale }] }}>
-      <Pressable
-        testID={testID}
-        onPress={onPress}
-        onPressIn={() => Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, speed: 40 }).start()}
-        onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start()}
-        style={[
-          styles.actionCard,
-          danger && styles.actionCardDanger,
-          green && styles.actionCardGreenBase,
-        ]}
-      >
-        {green && (
-          <>
-            <BlurView intensity={30} tint="light" style={StyleSheet.absoluteFill} />
-            <View style={[StyleSheet.absoluteFill, styles.actionCardGreenTint]} />
-            <LinearGradient
-              colors={["rgba(255,255,255,0.30)", "rgba(255,255,255,0.06)", "rgba(0,0,0,0.10)"]}
-              locations={[0, 0.45, 1]}
-              start={{ x: 0.1, y: 0 }}
-              end={{ x: 0.9, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </>
-        )}
-        {icon}
-        <Text style={[styles.actionLabel, danger && styles.actionLabelDanger, green && styles.actionLabelGreen]}>{label}</Text>
-        <Text style={[styles.actionSub, danger && styles.actionSubDanger, green && styles.actionSubGreen]}>{sub}</Text>
-      </Pressable>
-    </Animated.View>
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      style={styles.actionCard}
+    >
+      <View style={styles.actionIconCircle}>{icon}</View>
+      <Text style={styles.actionLabel}>{label}</Text>
+      <Text style={styles.actionSub}>{sub}</Text>
+    </Pressable>
   );
 }
 
@@ -462,40 +435,22 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: light.cardBorder,
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  actionCardDanger: {
-    backgroundColor: light.accentRed,
-    borderColor: light.accentRed,
-    shadowColor: light.accentRed,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
+  actionIconCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: light.chip,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
   },
-  actionCardGreenBase: {
-    backgroundColor: "#3E9E63",
-    borderColor: "rgba(255,255,255,0.35)",
-    borderWidth: 1,
-    overflow: "hidden",
-    shadowColor: "#1E7A3E",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  actionCardGreenTint: {
-    backgroundColor: "rgba(47,174,89,0.62)",
-  },
-  actionLabel: { color: light.text, fontSize: 13, fontWeight: "700", marginTop: 8 },
-  actionLabelDanger: { color: "#fff" },
-  actionLabelGreen: { color: "#fff" },
-  actionSub: { color: light.textSecondary, fontSize: 10, marginTop: 2, textAlign: "center" },
-  actionSubDanger: { color: "rgba(255,255,255,0.65)" },
-  actionSubGreen: { color: "rgba(255,255,255,0.65)" },
+  actionLabel: { color: light.text, fontSize: 14, fontWeight: "600" },
+  actionSub: { color: light.textSecondary, fontSize: 12, marginTop: 3, textAlign: "center" },
 
   block: { marginTop: 30 },
   blockHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
