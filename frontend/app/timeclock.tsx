@@ -123,7 +123,7 @@ export default function TimeClock() {
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }}>
+        <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }} accessibilityLabel="Go back" accessibilityRole="button">
           <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
         </Pressable>
         <Text style={styles.title}>Time Clock</Text>
@@ -162,6 +162,8 @@ export default function TimeClock() {
               testID="capture-selfie-btn"
               onPress={Platform.OS === "web" ? () => { setSelfie("web-mock-selfie"); setStep("confirming"); } : captureSelfie}
               style={styles.captureBtn}
+              accessibilityLabel="Capture selfie"
+              accessibilityRole="button"
             >
               <View style={styles.captureInner} />
             </Pressable>

@@ -82,7 +82,7 @@ export default function SOSScreen() {
           <Text style={styles.sentSub}>
             Your supervisor has been notified with your GPS coordinates. Stay on the line and move to a safe area.
           </Text>
-          <Pressable style={styles.doneBtn} onPress={() => router.back()}>
+          <Pressable style={styles.doneBtn} onPress={() => router.back()} accessibilityLabel="Back to App" accessibilityRole="button">
             <Text style={styles.doneBtnText}>Back to App</Text>
           </Pressable>
         </View>
@@ -93,7 +93,7 @@ export default function SOSScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
           <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
         </Pressable>
         <Text style={styles.title}>Emergency SOS</Text>
@@ -157,11 +157,11 @@ export default function SOSScreen() {
                 </View>
               ) : (
                 <>
-                  <Pressable style={styles.sendBtn} onPress={sendSOS}>
+                  <Pressable style={styles.sendBtn} onPress={sendSOS} accessibilityLabel="Send SOS Now" accessibilityRole="button">
                     <Ionicons name="alert-circle" size={20} color="#fff" />
                     <Text style={styles.sendBtnText}>Send SOS Now</Text>
                   </Pressable>
-                  <Pressable style={styles.cancelBtn} onPress={cancelSOS}>
+                  <Pressable style={styles.cancelBtn} onPress={cancelSOS} accessibilityLabel="Cancel SOS" accessibilityRole="button">
                     <Text style={styles.cancelBtnText}>Cancel</Text>
                   </Pressable>
                 </>

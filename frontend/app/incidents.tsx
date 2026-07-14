@@ -72,17 +72,17 @@ export default function Incidents() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
-        <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }}>
+        <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }} accessibilityLabel="Go back" accessibilityRole="button">
           <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
         </Pressable>
         <Text style={styles.title}>Incident Report</Text>
       </View>
 
       <View style={styles.segmented}>
-        <Pressable testID="tab-new" onPress={() => setTab("new")} style={[styles.segBtn, tab === "new" && styles.segActive]}>
+        <Pressable testID="tab-new" onPress={() => setTab("new")} style={[styles.segBtn, tab === "new" && styles.segActive]} accessibilityLabel="New incident" accessibilityRole="tab" accessibilityState={{ selected: tab === "new" }}>
           <Text style={[styles.segText, tab === "new" && styles.segTextActive]}>New</Text>
         </Pressable>
-        <Pressable testID="tab-history" onPress={() => setTab("history")} style={[styles.segBtn, tab === "history" && styles.segActive]}>
+        <Pressable testID="tab-history" onPress={() => setTab("history")} style={[styles.segBtn, tab === "history" && styles.segActive]} accessibilityLabel="Incident history" accessibilityRole="tab" accessibilityState={{ selected: tab === "history" }}>
           <Text style={[styles.segText, tab === "history" && styles.segTextActive]}>History · {items.length}</Text>
         </Pressable>
       </View>
@@ -93,7 +93,7 @@ export default function Incidents() {
             <Text style={styles.label}>Type</Text>
             <View style={styles.chipRow}>
               {TYPES.map((t) => (
-                <Pressable key={t.id} testID={`type-${t.id}`} onPress={() => setType(t.id)} style={[styles.chip, type === t.id && styles.chipActive]}>
+                <Pressable key={t.id} testID={`type-${t.id}`} onPress={() => setType(t.id)} style={[styles.chip, type === t.id && styles.chipActive]} accessibilityLabel={t.label} accessibilityRole="radio" accessibilityState={{ checked: type === t.id }}>
                   <Text style={[styles.chipText, type === t.id && styles.chipTextActive]}>{t.label}</Text>
                 </Pressable>
               ))}
@@ -102,7 +102,7 @@ export default function Incidents() {
             <Text style={styles.label}>Severity</Text>
             <View style={styles.chipRow}>
               {SEVERITIES.map((s) => (
-                <Pressable key={s} testID={`sev-${s}`} onPress={() => setSeverity(s)} style={[styles.chip, severity === s && styles.chipActive]}>
+                <Pressable key={s} testID={`sev-${s}`} onPress={() => setSeverity(s)} style={[styles.chip, severity === s && styles.chipActive]} accessibilityLabel={s[0].toUpperCase() + s.slice(1)} accessibilityRole="radio" accessibilityState={{ checked: severity === s }}>
                   <Text style={[styles.chipText, severity === s && styles.chipTextActive]}>{s[0].toUpperCase() + s.slice(1)}</Text>
                 </Pressable>
               ))}
@@ -128,13 +128,13 @@ export default function Incidents() {
                   <Ionicons name="image" size={22} color={theme.colors.textSecondary} />
                 </View>
               ))}
-              <Pressable testID="add-photo-btn" onPress={pickPhoto} style={styles.addPhoto}>
+              <Pressable testID="add-photo-btn" onPress={pickPhoto} style={styles.addPhoto} accessibilityLabel="Add photo" accessibilityRole="button">
                 <Ionicons name="add" size={22} color={theme.colors.textSecondary} />
               </Pressable>
             </View>
 
             <Text style={styles.label}>Signature</Text>
-            <Pressable testID="signature-pad" onPress={() => setSigned((v) => !v)} style={[styles.sigPad, signed && styles.sigPadSigned]}>
+            <Pressable testID="signature-pad" onPress={() => setSigned((v) => !v)} style={[styles.sigPad, signed && styles.sigPadSigned]} accessibilityLabel={signed ? "Signed. Tap to remove signature." : "Tap to sign."} accessibilityRole="button">
               <Text style={[styles.sigText, signed && { color: theme.colors.text }]}>{signed ? "✓ Signed" : "Tap to sign"}</Text>
             </Pressable>
 

@@ -24,6 +24,9 @@ export function Button({ label, onPress, variant = 'primary', disabled, style, t
         testID={testID}
         onPress={handlePress}
         disabled={disabled}
+        accessibilityLabel={label}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: !!disabled }}
         onPressIn={() => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start()}
         onPressOut={() => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 40 }).start()}
         style={[

@@ -171,10 +171,10 @@ export default function Community() {
               <Text style={styles.subtitle}>Updates & announcements from your team</Text>
             </View>
             <View style={styles.headerIcons}>
-              <Pressable hitSlop={10} style={styles.iconBtn}>
+              <Pressable hitSlop={10} style={styles.iconBtn} accessibilityLabel="Search" accessibilityRole="button">
                 <Ionicons name="search" size={18} color={C.text} />
               </Pressable>
-              <Pressable hitSlop={10} style={styles.composeBtn}>
+              <Pressable hitSlop={10} style={styles.composeBtn} accessibilityLabel="Create post" accessibilityRole="button">
                 <Ionicons name="create-outline" size={18} color="#FFFFFF" />
               </Pressable>
             </View>
@@ -210,14 +210,14 @@ export default function Community() {
                 <View style={styles.pendingAttachment}>
                   <Ionicons name={pendingAttachment.kind === "image" ? "image" : "document"} size={16} color={C.accent} />
                   <Text style={styles.pendingAttachmentName} numberOfLines={1}>{pendingAttachment.name}</Text>
-                  <Pressable testID="remove-attachment" onPress={() => setPendingAttachment(null)} hitSlop={8}>
+                  <Pressable testID="remove-attachment" onPress={() => setPendingAttachment(null)} hitSlop={8} accessibilityLabel="Remove attachment" accessibilityRole="button">
                     <Ionicons name="close-circle" size={16} color={C.textTertiary} />
                   </Pressable>
                 </View>
               )}
               <View style={styles.composerToolbar}>
                 <View style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
-                  <Pressable testID="attach-photo-btn" onPress={pickAttachment} disabled={attaching} hitSlop={6}>
+                  <Pressable testID="attach-photo-btn" onPress={pickAttachment} disabled={attaching} hitSlop={6} accessibilityLabel="Attach photo" accessibilityRole="button">
                     {attaching
                       ? <ActivityIndicator size="small" color={C.textSecondary} />
                       : <Ionicons name="image-outline" size={19} color={pendingAttachment ? C.accent : C.textSecondary} />}
@@ -230,6 +230,9 @@ export default function Community() {
                   onPress={submitPost}
                   disabled={!draft.trim() || posting}
                   style={[styles.postBtn, (!draft.trim() || posting) && styles.postBtnDisabled]}
+                  accessibilityLabel="Post"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !draft.trim() || posting }}
                 >
                   {posting
                     ? <ActivityIndicator color={C.accent} size="small" />
@@ -249,6 +252,9 @@ export default function Community() {
                       testID={`filter-${f.key}`}
                       onPress={() => setFilter(f.key)}
                       style={[styles.chip, active && styles.chipActive]}
+                      accessibilityLabel={f.label}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: active }}
                     >
                       {f.icon && <Ionicons name={f.icon} size={13} color={active ? "#FFFFFF" : C.accent} />}
                       <Text style={[styles.chipText, active && styles.chipTextActive]}>{f.label}</Text>
@@ -276,7 +282,7 @@ export default function Community() {
                         <Text style={styles.postMeta}>@{p.author_handle} · {relativeTime(p.created_at)}</Text>
                       </View>
                       {isAdmin && (
-                        <Pressable testID={`post-menu-${p.id}`} onPress={() => deletePost(p.id)} hitSlop={8}>
+                        <Pressable testID={`post-menu-${p.id}`} onPress={() => deletePost(p.id)} hitSlop={8} accessibilityLabel="Delete post" accessibilityRole="button">
                           <Ionicons name="trash-outline" size={16} color={C.textTertiary} />
                         </Pressable>
                       )}
@@ -298,6 +304,8 @@ export default function Community() {
                         testID={`attachment-${p.id}-${i}`}
                         style={styles.attachmentCard}
                         onPress={() => a.url && Linking.openURL(`${process.env.EXPO_PUBLIC_BACKEND_URL || ""}${a.url}`)}
+                        accessibilityLabel={`Open ${a.name}`}
+                        accessibilityRole="button"
                       >
                         <View style={styles.attachmentIcon}>
                           <Ionicons name={a.kind === "image" ? "image" : "document"} size={18} color={C.blue} />
@@ -311,7 +319,7 @@ export default function Community() {
                     ))}
 
                     <View style={styles.postFooter}>
-                      <Pressable testID={`like-${p.id}`} onPress={() => toggleLike(p.id)} style={styles.footerBtn} hitSlop={6}>
+                      <Pressable testID={`like-${p.id}`} onPress={() => toggleLike(p.id)} style={styles.footerBtn} hitSlop={6} accessibilityLabel={p.liked_by_me ? "Unlike" : "Like"} accessibilityRole="button">
                         <Ionicons name={p.liked_by_me ? "heart" : "heart-outline"} size={17} color={p.liked_by_me ? "#E13B3B" : C.textSecondary} />
                         <Text style={styles.footerCount}>{p.like_count}</Text>
                       </Pressable>
@@ -320,6 +328,8 @@ export default function Community() {
                         onPress={() => setOpenComments(showComments ? null : p.id)}
                         style={styles.footerBtn}
                         hitSlop={6}
+                        accessibilityLabel={showComments ? "Hide comments" : "Show comments"}
+                        accessibilityRole="button"
                       >
                         <Ionicons name="chatbubble-outline" size={16} color={C.textSecondary} />
                         <Text style={styles.footerCount}>{p.comment_count}</Text>
@@ -347,7 +357,7 @@ export default function Community() {
                             placeholderTextColor={C.textTertiary}
                             style={styles.commentInput}
                           />
-                          <Pressable testID={`comment-send-${p.id}`} onPress={() => submitComment(p.id)} hitSlop={8}>
+                          <Pressable testID={`comment-send-${p.id}`} onPress={() => submitComment(p.id)} hitSlop={8} accessibilityLabel="Send comment" accessibilityRole="button">
                             <Ionicons name="send" size={17} color={C.accent} />
                           </Pressable>
                         </View>

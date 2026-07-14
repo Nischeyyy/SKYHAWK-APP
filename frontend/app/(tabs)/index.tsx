@@ -95,7 +95,7 @@ export default function Dashboard() {
           <Text style={{ color: light.textSecondary, fontSize: 15, textAlign: 'center', marginBottom: 20 }}>
             {loadError}
           </Text>
-          <Pressable onPress={load} style={{ backgroundColor: light.card, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }}>
+          <Pressable onPress={load} style={{ backgroundColor: light.card, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 }} accessibilityLabel="Retry" accessibilityRole="button">
             <Text style={{ color: light.text, fontWeight: '600' }}>Retry</Text>
           </Pressable>
         </View>
@@ -160,11 +160,13 @@ export default function Dashboard() {
                 onPress={() => { tap(); router.push("/announcements"); }}
                 hitSlop={10}
                 style={styles.bellBtn}
+                accessibilityLabel="Announcements"
+                accessibilityRole="button"
               >
                 <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
                 {data?.unread_announcements > 0 && <View style={styles.bellDot} />}
               </Pressable>
-              <Pressable testID="profile-avatar-btn" onPress={() => { tap(); router.push("/(tabs)/profile"); }}>
+              <Pressable testID="profile-avatar-btn" onPress={() => { tap(); router.push("/(tabs)/profile"); }} accessibilityLabel="View profile" accessibilityRole="button">
                 <Avatar name={user?.full_name} size={40} />
               </Pressable>
             </View>
@@ -178,6 +180,8 @@ export default function Dashboard() {
                 testID="today-assignment-card"
                 onPress={() => router.push({ pathname: "/shift/[id]", params: { id: today.id } })}
                 style={styles.assignCard}
+                accessibilityLabel={`Today's assignment at ${today.site?.name}`}
+                accessibilityRole="button"
               >
                 <View style={styles.assignIconWrap}>
                   <Ionicons name="business-outline" size={22} color={light.text} />
@@ -203,6 +207,8 @@ export default function Dashboard() {
                 testID={activeClock ? "clock-out-btn" : "clock-in-btn"}
                 onPress={() => router.push({ pathname: "/timeclock", params: { shift_id: today.id } })}
                 style={styles.clockInBtn}
+                accessibilityLabel={activeClock ? "Clocked in — manage shift" : "Clock in"}
+                accessibilityRole="button"
               >
                 <Ionicons name="scan-outline" size={20} color="#fff" />
                 <Text style={styles.clockInText}>{activeClock ? "Clocked In · Manage" : "Clock In"}</Text>
@@ -214,7 +220,7 @@ export default function Dashboard() {
                 <Text style={styles.assignSite}>No shift scheduled</Text>
                 <Text style={styles.assignRole}>Browse the marketplace to pick up open shifts.</Text>
               </View>
-              <Pressable testID="browse-shifts-btn" onPress={() => router.push("/(tabs)/shifts")}>
+              <Pressable testID="browse-shifts-btn" onPress={() => router.push("/(tabs)/shifts")} accessibilityLabel="Browse shifts" accessibilityRole="button">
                 <Ionicons name="chevron-forward" size={18} color={light.textTertiary} />
               </Pressable>
             </View>
@@ -252,7 +258,7 @@ export default function Dashboard() {
             <View style={styles.block}>
               <View style={styles.blockHeader}>
                 <Text style={styles.sectionLabel}>UPCOMING SHIFTS</Text>
-                <Pressable testID="view-schedule-link" onPress={() => { tap(); router.push("/(tabs)/schedule"); }} style={styles.rowLink}>
+                <Pressable testID="view-schedule-link" onPress={() => { tap(); router.push("/(tabs)/schedule"); }} style={styles.rowLink} accessibilityLabel="View schedule" accessibilityRole="link">
                   <Text style={styles.linkText}>View Schedule</Text>
                   <Ionicons name="chevron-forward" size={14} color={light.textSecondary} />
                 </Pressable>
@@ -264,6 +270,8 @@ export default function Dashboard() {
                     testID={`upcoming-shift-${i}`}
                     onPress={() => router.push({ pathname: "/shift/[id]", params: { id: s.id } })}
                     style={[styles.shiftRow, i < upcomingShifts.length - 1 && styles.rowDivider]}
+                    accessibilityLabel={`Shift at ${s.site?.name}, ${shiftTime(s.start)} to ${shiftTime(s.end)}`}
+                    accessibilityRole="button"
                   >
                     <View style={styles.dateBadge}>
                       <Text style={styles.dateBadgeMonth}>{monthAbbrev(s.start)}</Text>
