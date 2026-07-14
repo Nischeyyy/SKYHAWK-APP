@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { api, setToken, getToken, setUnauthorizedHandler } from '../api/client';
 
 type User = {
@@ -35,6 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
+  // Only show "session expired" if the user was confirmed authenticated this session
+  const wasAuthenticated = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -43,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         return;
       }
-      const u = await api<User>('/auth/me');
+      const u = await api<User>('/auth/me', { skipUnauthorizedHandler: true });
       setUser(u);
     } catch {
       await setToken(null);
@@ -51,12 +53,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Track when the user has been confirmed as logged in this session
+  useEffect(() => {
+    if (user !== null) wasAuthenticated.current = true;
+  }, [user]);
+
   // Register the global 401 handler so any screen's api() call can clear the session.
+  // Only show "session expired" if the user was actually authenticated — not on bootstrap 401s.
   useEffect(() => {
     setUnauthorizedHandler(async () => {
       await setToken(null);
       setUser(null);
-      setSessionExpired(true);
+      if (wasAuthenticated.current) setSessionExpired(true);
+      wasAuthenticated.current = false;
     });
   }, []);
 

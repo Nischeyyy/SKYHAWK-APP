@@ -84,9 +84,9 @@ function sleep(ms: number) {
 
 export async function api<T = any>(
   path: string,
-  opts: { method?: string; body?: any; auth?: boolean } = {}
+  opts: { method?: string; body?: any; auth?: boolean; skipUnauthorizedHandler?: boolean } = {}
 ): Promise<T> {
-  const { method = 'GET', body, auth = true } = opts;
+  const { method = 'GET', body, auth = true, skipUnauthorizedHandler = false } = opts;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -114,7 +114,7 @@ export async function api<T = any>(
 
     // 401 on an authenticated call: session expired — clear it and stop retrying.
     if (res.status === 401 && auth) {
-      _onUnauthorized?.();
+      if (!skipUnauthorizedHandler) _onUnauthorized?.();
       throw new Error('SESSION_EXPIRED');
     }
 
