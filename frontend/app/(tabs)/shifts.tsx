@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/src/api/client";
 import { formatShiftTime, formatDate, hoursBetween } from "@/src/utils/format";
 import { success as hapticSuccess, impact as hapticImpact } from "@/src/utils/haptics";
+import { DeadButton, DeadText } from "@/src/components/DeadButton";
 
 // ─── Light palette (matches Profile / Community / Wallet) ──────────────────
 const C = {
@@ -104,7 +105,9 @@ export default function OpenShifts() {
           <Text style={styles.subtitle}>{shifts.length} available</Text>
         </View>
         <Pressable testID="filter-btn" hitSlop={10} style={styles.filterBtn}>
-          <Ionicons name="filter" size={18} color={C.text} />
+          <DeadButton style={styles.filterBtn}>
+            <Ionicons name="filter" size={18} color={C.text} />
+          </DeadButton>
         </Pressable>
       </View>
       {loading ? (
@@ -217,7 +220,7 @@ export default function OpenShifts() {
                 <Text style={styles.bannerSub}>Check back often to grab the best opportunities.</Text>
               </View>
               <Pressable testID="turn-on-alerts" hitSlop={8}>
-                <Text style={styles.bannerLink}>Turn on alerts</Text>
+                <DeadText style={styles.bannerLink}>Turn on alerts</DeadText>
               </Pressable>
             </View>
           )}

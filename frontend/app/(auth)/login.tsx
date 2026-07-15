@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/src/auth/AuthContext";
+import { DeadText } from "@/src/components/DeadButton";
 
 // ── Light-theme palette (auth screens only) ───────────────────────────────────
 const W = {
@@ -109,7 +110,7 @@ export default function Login() {
                 style={styles.input}
               />
               <Pressable style={styles.forgotWrap} onPress={() => {}}>
-                <Text style={styles.forgotText}>Forgot Password?</Text>
+                <DeadText style={styles.forgotText}>Forgot Password?</DeadText>
               </Pressable>
             </View>
 

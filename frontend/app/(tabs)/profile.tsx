@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Avatar, StatusPill } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
+import { DeadButton } from "@/src/components/DeadButton";
 
 // ─── Light palette (matches Schedule / reference design) ───────────────────
 const C = {
@@ -89,7 +90,9 @@ export default function Profile() {
         <Text style={s.navTitle}>Profile</Text>
         <View style={s.navIcons}>
           <Pressable hitSlop={10} style={s.navIconBtn}>
-            <Ionicons name="notifications-outline" size={22} color={C.text} />
+            <DeadButton>
+              <Ionicons name="notifications-outline" size={22} color={C.text} />
+            </DeadButton>
           </Pressable>
           <Pressable hitSlop={10} style={s.navIconBtn} onPress={() => router.push("/settings")}>
             <Ionicons name="settings-outline" size={22} color={C.text} />
