@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, TextInput,
   ActivityIndicator, KeyboardAvoidingView, Platform, Alert, Linking,
@@ -73,6 +73,10 @@ export default function Community() {
   const [commentDraft, setCommentDraft] = useState("");
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; name: string; kind: string; size: number } | null>(null);
   const [attaching, setAttaching] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const composerInputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const isAdmin = user?.role === "admin";
 
   const load = useCallback(async (f: string) => {
@@ -156,10 +160,27 @@ export default function Community() {
     } catch {}
   };
 
+  const filteredPosts = posts.filter((p) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (p.body || "").toLowerCase().includes(q) ||
+      (p.title || "").toLowerCase().includes(q) ||
+      (p.author_name || "").toLowerCase().includes(q) ||
+      (p.author_handle || "").toLowerCase().includes(q)
+    );
+  });
+
+  const focusComposer = () => {
+    setSearchOpen(false);
+    composerInputRef.current?.focus();
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={{ paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -171,16 +192,44 @@ export default function Community() {
               <Text style={styles.subtitle}>Updates & announcements from your team</Text>
             </View>
             <View style={styles.headerIcons}>
-              <Pressable hitSlop={10} style={styles.iconBtn} accessibilityLabel="Search" accessibilityRole="button">
-                <Ionicons name="search" size={18} color={C.text} />
+              <Pressable
+                hitSlop={10}
+                style={styles.iconBtn}
+                onPress={() => setSearchOpen((v) => !v)}
+                accessibilityLabel="Search"
+                accessibilityRole="button"
+              >
+                <Ionicons name={searchOpen ? "close" : "search"} size={18} color={C.text} />
               </Pressable>
-              <Pressable hitSlop={10} style={styles.composeBtn} accessibilityLabel="Create post" accessibilityRole="button">
+              <Pressable
+                hitSlop={10}
+                style={styles.composeBtn}
+                onPress={focusComposer}
+                accessibilityLabel="Create post"
+                accessibilityRole="button"
+              >
                 <Ionicons name="create-outline" size={18} color="#FFFFFF" />
               </Pressable>
             </View>
           </View>
 
           <View style={{ paddingHorizontal: 20 }}>
+            {/* Search bar */}
+            {searchOpen && (
+              <View style={styles.searchBar}>
+                <Ionicons name="search" size={16} color={C.textTertiary} />
+                <TextInput
+                  testID="search-input"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search posts..."
+                  placeholderTextColor={C.textTertiary}
+                  style={styles.searchInput}
+                  autoFocus
+                />
+              </View>
+            )}
+
             {/* Composer */}
             <View style={styles.composer} testID="composer-card">
               <View style={styles.composerTop}>
@@ -196,6 +245,7 @@ export default function Community() {
               </View>
               <View style={styles.composerInputRow}>
                 <TextInput
+                  ref={composerInputRef}
                   testID="composer-input"
                   value={draft}
                   onChangeText={setDraft}
@@ -267,10 +317,10 @@ export default function Community() {
             {/* Feed */}
             {loading ? (
               <ActivityIndicator color={C.textSecondary} style={{ marginTop: 30 }} />
-            ) : posts.length === 0 ? (
-              <Text style={styles.empty}>Nothing here yet</Text>
+            ) : filteredPosts.length === 0 ? (
+              <Text style={styles.empty}>{searchQuery ? "No posts match your search" : "Nothing here yet"}</Text>
             ) : (
-              posts.map((p) => {
+              filteredPosts.map((p) => {
                 const meta = TYPE_META[p.type];
                 const showComments = openComments === p.id;
                 return (
@@ -383,6 +433,13 @@ const styles = StyleSheet.create({
   headerIcons: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
   iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.card, alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
   composeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.accent, alignItems: "center", justifyContent: "center" },
+
+  searchBar: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: C.card, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12,
+    marginBottom: 16, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 },
+  },
+  searchInput: { flex: 1, color: C.text, fontSize: 15 },
 
   composer: { backgroundColor: C.card, borderRadius: 18, padding: 16, marginBottom: 18, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
   composerTop: { flexDirection: "row", alignItems: "center" },
