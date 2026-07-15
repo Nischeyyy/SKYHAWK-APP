@@ -340,6 +340,34 @@ class SettingsIn(BaseModel):
     community_notifications: Optional[bool] = None
 
 
+class OnboardingDocIn(BaseModel):
+    type: str = Field(max_length=50)
+    name: str = Field(max_length=200)
+    number: str = Field(max_length=100)
+    expiry: str = Field(max_length=50)
+    attachment_url: Optional[str] = Field(default=None, max_length=500)
+
+
+class OnboardingSINIn(BaseModel):
+    sin: str = Field(min_length=9, max_length=11)
+
+
+class OnboardingDirectDepositIn(BaseModel):
+    institution: str = Field(max_length=10)
+    transit: str = Field(max_length=10)
+    account: str = Field(max_length=20)
+
+
+class OnboardingEmergencyContactIn(BaseModel):
+    name: str = Field(max_length=200)
+    phone: str = Field(max_length=50)
+    relation: str = Field(max_length=50)
+
+
+class OnboardingAgreementsIn(BaseModel):
+    signed: bool
+
+
 # ============================================================
 # App
 # ============================================================
@@ -1444,22 +1472,106 @@ async def profile(user=Depends(get_current_user)):
 # ============================================================
 # ONBOARDING
 # ============================================================
-@api.get("/onboarding/status")
-async def onboarding_status(user=Depends(get_current_user)):
+ONBOARDING_STEPS = [
+    "documents_uploaded",
+    "sin_submitted",
+    "direct_deposit_submitted",
+    "emergency_contact_added",
+    "agreements_signed",
+]
+
+
+async def _onboarding_status(user: dict) -> dict:
     ob = await db.onboarding.find_one({"user_id": user["id"]}, {"_id": 0})
     if not ob:
-        ob = {
-            "user_id": user["id"],
-            "documents_uploaded": user.get("onboarding_complete", False),
-            "sin_submitted": user.get("onboarding_complete", False),
-            "direct_deposit_submitted": user.get("onboarding_complete", False),
-            "emergency_contact_added": bool(user.get("emergency_contact")),
-            "agreements_signed": user.get("onboarding_complete", False),
-            "training_complete": user.get("onboarding_complete", False),
-        }
-    completed = sum(1 for v in ob.values() if v is True)
-    total = 6
-    return {"status": ob, "completed": completed, "total": total, "percent": int(completed / total * 100)}
+        ob = {"user_id": user["id"]}
+    # Emergency contact can also be satisfied by the user profile field.
+    if not ob.get("emergency_contact_added") and user.get("emergency_contact"):
+        ob["emergency_contact_added"] = True
+    status = {step: bool(ob.get(step)) for step in ONBOARDING_STEPS}
+    completed = sum(1 for v in status.values() if v)
+    total = len(ONBOARDING_STEPS)
+    return {"status": status, "completed": completed, "total": total, "percent": int(completed / total * 100)}
+
+
+@api.get("/onboarding/status")
+async def onboarding_status(user=Depends(get_current_user)):
+    return await _onboarding_status(user)
+
+
+@api.post("/onboarding/documents", status_code=201)
+async def onboarding_documents(body: OnboardingDocIn, user=Depends(get_current_user)):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "type": body.type,
+        "name": body.name,
+        "number": body.number,
+        "expiry": body.expiry,
+        "status": _compliance_status(body.expiry),
+        "attachment_url": body.attachment_url,
+        "created_at": iso(now_utc()),
+    }
+    await db.wallet_documents.insert_one(doc)
+    await db.onboarding.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"documents_uploaded": True, "updated_at": iso(now_utc())}},
+        upsert=True,
+    )
+    return await _onboarding_status(user)
+
+
+@api.post("/onboarding/sin", status_code=201)
+async def onboarding_sin(body: OnboardingSINIn, user=Depends(get_current_user)):
+    await db.users.update_one({"id": user["id"]}, {"$set": {"sin": body.sin}})
+    await db.onboarding.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"sin_submitted": True, "updated_at": iso(now_utc())}},
+        upsert=True,
+    )
+    return await _onboarding_status(user)
+
+
+@api.post("/onboarding/direct-deposit", status_code=201)
+async def onboarding_direct_deposit(body: OnboardingDirectDepositIn, user=Depends(get_current_user)):
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"direct_deposit": {"institution": body.institution, "transit": body.transit, "account": body.account}}},
+    )
+    await db.onboarding.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"direct_deposit_submitted": True, "updated_at": iso(now_utc())}},
+        upsert=True,
+    )
+    return await _onboarding_status(user)
+
+
+@api.post("/onboarding/emergency-contact", status_code=201)
+async def onboarding_emergency_contact(body: OnboardingEmergencyContactIn, user=Depends(get_current_user)):
+    contact = {"name": body.name, "phone": body.phone, "relation": body.relation}
+    await db.users.update_one({"id": user["id"]}, {"$set": {"emergency_contact": contact}})
+    await db.onboarding.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"emergency_contact_added": True, "updated_at": iso(now_utc())}},
+        upsert=True,
+    )
+    return await _onboarding_status(user)
+
+
+@api.post("/onboarding/agreements", status_code=201)
+async def onboarding_agreements(body: OnboardingAgreementsIn, user=Depends(get_current_user)):
+    if not body.signed:
+        raise HTTPException(400, "Agreements must be signed")
+    await db.onboarding.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"agreements_signed": True, "updated_at": iso(now_utc())}},
+        upsert=True,
+    )
+    # If all steps are complete, flip the master flag.
+    status = await _onboarding_status(user)
+    if status["percent"] == 100:
+        await db.users.update_one({"id": user["id"]}, {"$set": {"onboarding_complete": True}})
+    return status
 
 
 # ============================================================
