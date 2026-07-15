@@ -12,21 +12,20 @@ import { useAuth } from "@/src/auth/AuthContext";
 import { relativeTime } from "@/src/utils/format";
 import { success as hapticSuccess } from "@/src/utils/haptics";
 
-// ─── Dark palette (matches the original dark theme) ─────────────────────────
+// ─── White scheme with black buttons (matches the clean light look) ───────────
 const C = {
-  bg: "#000000",
-  card: "#161616",
-  cardElevated: "#1F1F1F",
-  border: "rgba(255,255,255,0.06)",
-  divider: "rgba(255,255,255,0.08)",
-  text: "#FFFFFF",
-  textSecondary: "#8E8E93",
-  textTertiary: "#636366",
-  accent: "#0A84FF",
-  accentSoft: "rgba(10,132,255,0.10)",
-  blue: "#0A84FF",
-  green: "#30D158",
-  amber: "#FF9F0A",
+  bg: "#F2F2F7",
+  card: "#FFFFFF",
+  border: "#E5E5EA",
+  divider: "#E5E5EA",
+  text: "#000000",
+  textSecondary: "#6C6C70",
+  textTertiary: "#AEAEB2",
+  accent: "#000000",
+  accentSoft: "rgba(0,0,0,0.06)",
+  blue: "#000000",
+  green: "#2FAE59",
+  amber: "#C77700",
 };
 
 const FILTERS: { key: string; label: string; icon: any }[] = [
@@ -37,7 +36,7 @@ const FILTERS: { key: string; label: string; icon: any }[] = [
 ];
 
 const TYPE_META: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  announcement: { label: "Announcement", color: C.blue, bg: "rgba(10,132,255,0.10)", icon: "megaphone" },
+  announcement: { label: "Announcement", color: C.accent, bg: C.accentSoft, icon: "megaphone" },
   event: { label: "Event", color: C.amber, bg: "rgba(199,119,0,0.10)", icon: "calendar" },
   recognition: { label: "Recognition", color: C.green, bg: "rgba(47,174,89,0.10)", icon: "star" },
 };
