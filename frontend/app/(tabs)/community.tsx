@@ -12,20 +12,21 @@ import { useAuth } from "@/src/auth/AuthContext";
 import { relativeTime } from "@/src/utils/format";
 import { success as hapticSuccess } from "@/src/utils/haptics";
 
-// ─── Light palette (matches Profile / Schedule) ─────────────────────────────
+// ─── Dark palette (matches the original dark theme) ─────────────────────────
 const C = {
-  bg: "#F2F2F7",
-  card: "#FFFFFF",
-  border: "#E5E5EA",
-  divider: "#E5E5EA",
-  text: "#0B0B0C",
-  textSecondary: "#6C6C70",
-  textTertiary: "#AEAEB2",
+  bg: "#000000",
+  card: "#161616",
+  cardElevated: "#1F1F1F",
+  border: "rgba(255,255,255,0.06)",
+  divider: "rgba(255,255,255,0.08)",
+  text: "#FFFFFF",
+  textSecondary: "#8E8E93",
+  textTertiary: "#636366",
   accent: "#0A84FF",
   accentSoft: "rgba(10,132,255,0.10)",
   blue: "#0A84FF",
-  green: "#2FAE59",
-  amber: "#C77700",
+  green: "#30D158",
+  amber: "#FF9F0A",
 };
 
 const FILTERS: { key: string; label: string; icon: any }[] = [
