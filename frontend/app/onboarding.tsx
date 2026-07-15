@@ -284,14 +284,15 @@ export default function Onboarding() {
 
       <Modal visible={!!activeStep} animationType="slide" transparent onRequestClose={closeStep}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <SafeAreaView style={styles.modalSafe}>
+          <SafeAreaView style={styles.modalSafe} edges={["top"]}>
             <View style={styles.modalHeader}>
-              <Pressable onPress={closeStep} hitSlop={12} style={{ paddingRight: 12 }}>
+              <Pressable onPress={closeStep} hitSlop={12} style={styles.modalClose}>
                 <Ionicons name="close" size={26} color={W.text} />
               </Pressable>
-              <Text style={styles.modalTitle}>
+              <Text style={styles.modalTitle} numberOfLines={1}>
                 {STEPS.find((s) => s.key === activeStep)?.label}
               </Text>
+              <View style={styles.modalClose} />
             </View>
             <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
               {activeStep === "documents_uploaded" && (
@@ -427,8 +428,9 @@ const styles = StyleSheet.create({
   stepSub: { color: W.textTertiary, fontSize: 12, marginTop: 2 },
 
   modalSafe: { flex: 1, backgroundColor: W.bg },
-  modalHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: W.border },
-  modalTitle: { color: W.text, fontSize: 18, fontWeight: "600" },
+  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: W.border },
+  modalClose: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  modalTitle: { flex: 1, color: W.text, fontSize: 18, fontWeight: "600", textAlign: "center" },
   label: { color: W.text, fontSize: 14, fontWeight: "500", marginTop: 20, marginBottom: 8 },
   hint: { color: W.textSecondary, fontSize: 13, marginTop: 6, marginBottom: 20 },
   input: { backgroundColor: W.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: W.text, fontSize: 15 },
@@ -442,7 +444,7 @@ const styles = StyleSheet.create({
   photoBtnText: { color: W.text, fontSize: 14, fontWeight: "500" },
   photoPreview: { position: "relative", alignSelf: "flex-start", marginBottom: 20 },
   photoThumb: { width: 120, height: 120, borderRadius: 12 },
-  removePhoto: { position: "absolute", top: -8, right: -8, backgroundColor: "#FFFFFF", borderRadius: 12 },
+  removePhoto: { position: "absolute", top: -6, right: -6, backgroundColor: "#FFFFFF", borderRadius: 12 },
   agreementBox: { backgroundColor: W.card, borderRadius: 12, padding: 14, marginTop: 8 },
   agreementText: { color: W.textSecondary, fontSize: 13, lineHeight: 20 },
   switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 20, marginBottom: 20 },
