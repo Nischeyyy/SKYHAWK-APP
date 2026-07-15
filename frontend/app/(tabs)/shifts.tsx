@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "@/src/api/client";
-import { formatShiftTime, formatDate, hoursBetween } from "@/src/utils/format";
+import { formatShiftTime, formatDate, hoursBetween, formatCurrency } from "@/src/utils/format";
 import { success as hapticSuccess, impact as hapticImpact } from "@/src/utils/haptics";
 import { DeadButton, DeadText } from "@/src/components/DeadButton";
 
@@ -48,6 +48,7 @@ export default function OpenShifts() {
   const [refreshing, setRefreshing] = useState(false);
   const [claiming, setClaiming] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -125,15 +126,21 @@ export default function OpenShifts() {
             const claimed = s.already_claimed;
             const waitlisted = s.on_waitlist;
             const isTopPick = idx === 0 && !claimed && !waitlisted; // Filled button only for #1
+            const expanded = expandedId === s.id;
             return (
-              <View key={s.id} testID={`open-shift-${s.id}`} style={styles.card}>
+              <Pressable
+                key={s.id}
+                testID={`open-shift-${s.id}`}
+                onPress={() => setExpandedId((id) => (id === s.id ? null : s.id))}
+                style={styles.card}
+              >
                 <View style={styles.itemHeader}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1, flexWrap: "wrap" }}>
                     <Text style={styles.itemDate}>{formatDate(s.start)}</Text>
                     {isTopPick && <Badge label="Top Pick" tone="accent" />}
                     {s.urgent && <Badge label="Urgent" tone="warning" />}
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={C.textTertiary} />
+                  <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={C.textTertiary} />
                 </View>
                 <Text style={styles.itemTime}>{formatShiftTime(s.start)} – {formatShiftTime(s.end)}</Text>
                 <View style={styles.metaRow}>
@@ -144,6 +151,30 @@ export default function OpenShifts() {
                   <Ionicons name="shield-outline" size={14} color={C.textSecondary} />
                   <Text style={styles.itemMeta}>{s.role} · {hrs}h · {spotsLeft} spot{spotsLeft !== 1 ? "s" : ""}</Text>
                 </View>
+
+                {expanded && (
+                  <View style={styles.details}>
+                    <View style={styles.divider} />
+                    <View style={styles.detailRow}>
+                      <Ionicons name="location-outline" size={14} color={C.textSecondary} />
+                      <Text style={styles.detailText}>{s.site?.address || "No address provided"}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Ionicons name="person-outline" size={14} color={C.textSecondary} />
+                      <Text style={styles.detailText}>Supervisor: {s.site?.supervisor || "—"}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Ionicons name="cash-outline" size={14} color={C.textSecondary} />
+                      <Text style={styles.detailText}>{formatCurrency(s.pay_rate)}/hr · Est. {formatCurrency(hrs * s.pay_rate)}</Text>
+                    </View>
+                    {s.site?.instructions ? (
+                      <View style={styles.detailRow}>
+                        <Ionicons name="information-circle-outline" size={14} color={C.textSecondary} />
+                        <Text style={styles.detailText}>{s.site.instructions}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                )}
 
                 <View style={styles.claimWrap}>
                   {waitlisted ? (
@@ -206,7 +237,7 @@ export default function OpenShifts() {
                     </View>
                   )}
                 </View>
-              </View>
+              </Pressable>
             );
           })}
 
@@ -284,6 +315,10 @@ const styles = StyleSheet.create({
   cancelLinkText: { color: C.textSecondary, fontSize: 13, fontWeight: "500" },
   claimWrap: { marginTop: 14, width: "100%" },
   empty: { color: C.textSecondary, textAlign: "center", marginTop: 60, fontSize: 15 },
+  divider: { height: 1, backgroundColor: C.divider, marginVertical: 14 },
+  details: { marginTop: 2 },
+  detailRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 8 },
+  detailText: { color: C.text, fontSize: 13.5, lineHeight: 19, flex: 1, marginTop: 1 },
   banner: {
     flexDirection: "row", alignItems: "center", gap: 12,
     backgroundColor: C.bannerBg, borderRadius: 16, padding: 16, marginTop: 4, marginBottom: 12,
