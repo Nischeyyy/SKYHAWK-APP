@@ -3,10 +3,20 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Linki
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { theme } from "@/src/theme";
 import { Button } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { formatShiftTime, formatDate, hoursBetween, formatCurrency } from "@/src/utils/format";
+
+const C = {
+  bg: "#F2F2F7",
+  card: "#FFFFFF",
+  border: "#E5E5EA",
+  divider: "#E5E5EA",
+  text: "#0B0B0C",
+  textSecondary: "#6C6C70",
+  textTertiary: "#AEAEB2",
+  accent: "#0A84FF",
+};
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
   scheduled: { label: "Scheduled", color: "#3B82F6", bg: "rgba(59,130,246,0.12)", icon: "calendar-outline" },
@@ -36,7 +46,7 @@ export default function ShiftDetail() {
     setAcking(false);
   };
 
-  if (loading || !s) return <SafeAreaView style={styles.safe}><ActivityIndicator color={theme.colors.textSecondary} style={{ marginTop: 40 }} /></SafeAreaView>;
+  if (loading || !s) return <SafeAreaView style={styles.safe}><ActivityIndicator color={C.textSecondary} style={{ marginTop: 40 }} /></SafeAreaView>;
 
   const scheduledHrs = hoursBetween(s.start, s.end);
   const actualHrs = s.hours_worked ?? null;
@@ -47,7 +57,7 @@ export default function ShiftDetail() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <Pressable testID="back-btn" onPress={() => router.back()} hitSlop={12} style={{ paddingRight: 12 }}>
-          <Ionicons name="chevron-back" size={26} color={theme.colors.text} />
+          <Ionicons name="chevron-back" size={26} color={C.text} />
         </Pressable>
         <Text style={styles.title}>Shift Details</Text>
         <View style={[styles.statusBadge, { backgroundColor: statusCfg.bg }]}>
@@ -100,7 +110,7 @@ export default function ShiftDetail() {
           <>
             <Text style={styles.groupLabel}>Manager Notes</Text>
             <View style={[styles.instructionsCard, styles.notesCard]}>
-              <Ionicons name="information-circle-outline" size={16} color={theme.colors.accent} style={{ marginBottom: 4 }} />
+              <Ionicons name="information-circle-outline" size={16} color={C.accent} style={{ marginBottom: 4 }} />
               <Text style={styles.notesText}>{s.notes}</Text>
             </View>
           </>
@@ -149,29 +159,29 @@ function Row({ label, value, last, highlight }: { label: string; value?: string 
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.colors.bg },
+  safe: { flex: 1, backgroundColor: C.bg },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
-  title: { color: theme.colors.text, fontSize: 20, fontWeight: "600", flex: 1 },
+  title: { color: C.text, fontSize: 20, fontWeight: "600", flex: 1 },
   statusBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   statusBadgeText: { fontSize: 12, fontWeight: "600" },
   hero: { paddingVertical: 20 },
-  date: { color: theme.colors.textSecondary, fontSize: 13, textTransform: "uppercase", letterSpacing: 0.6 },
-  time: { color: theme.colors.text, fontSize: 26, fontWeight: "600", marginTop: 4, letterSpacing: -0.3 },
-  site: { color: theme.colors.text, fontSize: 17, marginTop: 10 },
-  role: { color: theme.colors.textSecondary, fontSize: 14, marginTop: 2 },
-  groupLabel: { color: theme.colors.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6, marginTop: 20, marginBottom: 8, paddingHorizontal: 4 },
-  group: { backgroundColor: theme.colors.card, borderRadius: theme.radius.md, paddingHorizontal: 16 },
+  date: { color: C.textSecondary, fontSize: 13, textTransform: "uppercase", letterSpacing: 0.6 },
+  time: { color: C.text, fontSize: 26, fontWeight: "600", marginTop: 4, letterSpacing: -0.3 },
+  site: { color: C.text, fontSize: 17, marginTop: 10 },
+  role: { color: C.textSecondary, fontSize: 14, marginTop: 2 },
+  groupLabel: { color: C.textSecondary, fontSize: 12, textTransform: "uppercase", letterSpacing: 0.6, marginTop: 20, marginBottom: 8, paddingHorizontal: 4 },
+  group: { backgroundColor: C.card, borderRadius: 14, paddingHorizontal: 16 },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12 },
-  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.divider },
-  rowLabel: { color: theme.colors.text, fontSize: 15 },
-  rowValue: { color: theme.colors.textSecondary, fontSize: 14, maxWidth: "60%", textAlign: "right" },
+  rowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.divider },
+  rowLabel: { color: C.text, fontSize: 15 },
+  rowValue: { color: C.textSecondary, fontSize: 14, maxWidth: "60%", textAlign: "right" },
   rowValueHighlight: { color: "#22C55E", fontWeight: "600" },
-  instructionsCard: { backgroundColor: theme.colors.card, borderRadius: theme.radius.md, padding: 16 },
-  notesCard: { borderLeftWidth: 3, borderLeftColor: theme.colors.accent },
-  instructions: { color: theme.colors.text, fontSize: 14, lineHeight: 21 },
-  notesText: { color: theme.colors.text, fontSize: 14, lineHeight: 21 },
+  instructionsCard: { backgroundColor: C.card, borderRadius: 14, padding: 16 },
+  notesCard: { borderLeftWidth: 3, borderLeftColor: C.accent },
+  instructions: { color: C.text, fontSize: 14, lineHeight: 21 },
+  notesText: { color: C.text, fontSize: 14, lineHeight: 21 },
   ackedRow: { flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center", marginTop: 16 },
-  ackedText: { color: theme.colors.textSecondary, fontSize: 13 },
-  completedBanner: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(34,197,94,0.1)", borderRadius: theme.radius.md, padding: 14, marginTop: 20 },
+  ackedText: { color: C.textSecondary, fontSize: 13 },
+  completedBanner: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(34,197,94,0.1)", borderRadius: 14, padding: 14, marginTop: 20 },
   completedText: { color: "#22C55E", fontSize: 14, fontWeight: "600" },
 });
