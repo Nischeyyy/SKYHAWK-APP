@@ -34,3 +34,16 @@ export function relativeTime(iso: string): string {
   const d = Math.floor(h / 24);
   return `${d}d ago`;
 }
+
+export function startsIn(iso: string): string {
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diffMin = Math.floor((then - now) / 60000);
+  if (diffMin < 1) return 'now';
+  if (diffMin < 60) return `Starts in ${diffMin}m`;
+  const h = Math.floor(diffMin / 60);
+  const m = diffMin % 60;
+  if (h < 24) return `Starts in ${h}h ${m > 0 ? `${m}m` : ''}`.trim();
+  const d = Math.floor(h / 24);
+  return `Starts in ${d}d`;
+}

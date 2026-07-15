@@ -8,6 +8,7 @@ import { Avatar } from "@/src/ui";
 import { api } from "@/src/api/client";
 import { useAuth } from "@/src/auth/AuthContext";
 import { tap, warn as hapticWarn } from "@/src/utils/haptics";
+import { startsIn } from "@/src/utils/format";
 import { light } from "@/src/theme/light";
 
 function greetingLabel() {
@@ -195,7 +196,7 @@ export default function Dashboard() {
                 <View style={styles.assignRightCol}>
                   <View style={styles.upcomingPill}>
                     <View style={styles.upcomingDot} />
-                    <Text style={styles.upcomingPillText}>Upcoming</Text>
+                    <Text style={styles.upcomingPillText}>{startsIn(today.start)}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={light.textTertiary} style={{ marginTop: 14 }} />
                 </View>
@@ -280,7 +281,7 @@ export default function Dashboard() {
                     </View>
                     <View style={{ alignItems: "flex-end" }}>
                       <View style={styles.scheduledPill}>
-                        <Text style={styles.scheduledPillText}>Scheduled</Text>
+                        <Text style={styles.scheduledPillText}>{startsIn(s.start)}</Text>
                       </View>
                       <Ionicons name="chevron-forward" size={16} color={light.textTertiary} style={{ marginTop: 10 }} />
                     </View>
