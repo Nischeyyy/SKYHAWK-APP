@@ -319,6 +319,11 @@ class CommunityCommentIn(BaseModel):
     body: str = Field(min_length=1, max_length=1000)
 
 
+class CommunityEditIn(BaseModel):
+    body: str = Field(min_length=1, max_length=4000)
+    attachments: List[dict] = Field(default_factory=list)
+
+
 class ChangePasswordIn(BaseModel):
     current_password: str
     new_password: str = Field(min_length=6)
@@ -700,48 +705,6 @@ async def seed_data():
         {"id": str(uuid.uuid4()), "user_id": guard_id, "type": "keys",
          "description": "Master keyring #K-88 (Bay St)", "issued_at": iso(now_utc() - timedelta(days=60)), "status": "issued"},
     ])
-
-    # Community feed
-    t_now = now_utc()
-    community_posts = [
-        {
-            "id": str(uuid.uuid4()),
-            "author_id": None, "author_name": "Samantha Lee", "author_handle": "samanthalee",
-            "author_photo": "https://images.unsplash.com/photo-1580489944761-15a19d654956",
-            "audience": "All Staff", "type": "announcement",
-            "title": "New Parking Instructions – Downtown Sites",
-            "body": "Starting Monday, please use the west entrance for all downtown sites. See the attached map for details.",
-            "attachments": [{"name": "Downtown Parking Map.pdf", "kind": "pdf", "size_label": "1.2 MB"}],
-            "created_at": iso(t_now - timedelta(hours=2)),
-            "likes": [], "comments": [], "seen_by": [admin_id, guard2_id],
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "author_id": None, "author_name": "Jamal Carter", "author_handle": "jamal.carter",
-            "author_photo": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
-            "audience": "All Staff", "type": "recognition",
-            "title": None,
-            "body": "Huge shoutout to the team at Harbourfront last night. Great work keeping the event safe and running smoothly!",
-            "attachments": [],
-            "created_at": iso(t_now - timedelta(hours=5)),
-            "likes": [guard_id, admin_id], "comments": [
-                {"id": str(uuid.uuid4()), "user_id": guard_id, "user_name": "Marcus Vance",
-                 "body": "Team effort all around!", "created_at": iso(t_now - timedelta(hours=4))},
-            ], "seen_by": [admin_id, guard_id, guard2_id],
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "author_id": None, "author_name": "Elena Rodriguez", "author_handle": "elena.rodriguez",
-            "author_photo": "https://images.unsplash.com/photo-1544005313-94ddf0286df2",
-            "audience": "All Staff", "type": "event",
-            "title": "Quarterly Safety Training",
-            "body": "Mandatory refresher training on de-escalation and emergency response — Saturday 10am at the Bay Street office. Please confirm attendance with your supervisor.",
-            "attachments": [],
-            "created_at": iso(t_now - timedelta(days=1)),
-            "likes": [], "comments": [], "seen_by": [admin_id],
-        },
-    ]
-    await db.community_posts.insert_many(community_posts)
 
     logger.info("Seed complete.")
 
@@ -2806,6 +2769,32 @@ async def admin_delete_community_post(post_id: str, admin=Depends(require_admin)
     if r.deleted_count == 0:
         raise HTTPException(404, "Post not found")
     return {"deleted": True}
+
+
+@api.delete("/community/posts/{post_id}")
+async def delete_own_community_post(post_id: str, user=Depends(get_current_user)):
+    q = {"id": post_id}
+    if user["role"] != "admin":
+        q["author_id"] = user["id"]
+    r = await db.community_posts.delete_one(q)
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Post not found or not authorized")
+    return {"deleted": True}
+
+
+@api.put("/community/posts/{post_id}")
+async def edit_own_community_post(post_id: str, body: CommunityEditIn, user=Depends(get_current_user)):
+    q = {"id": post_id}
+    if user["role"] != "admin":
+        q["author_id"] = user["id"]
+    r = await db.community_posts.update_one(
+        q,
+        {"$set": {"body": body.body, "attachments": body.attachments, "updated_at": iso(now_utc())}}
+    )
+    if r.matched_count == 0:
+        raise HTTPException(404, "Post not found or not authorized")
+    post = await db.community_posts.find_one({"id": post_id}, {"_id": 0})
+    return _serialize_post(post, user["id"])
 
 
 app.include_router(api)

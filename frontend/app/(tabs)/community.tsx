@@ -75,6 +75,9 @@ export default function Community() {
   const [attaching, setAttaching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const composerInputRef = useRef<TextInput>(null);
   const scrollRef = useRef<ScrollView>(null);
   const isAdmin = user?.role === "admin";
@@ -127,16 +130,48 @@ export default function Community() {
     setPosting(false);
   };
 
+  const canManage = (p: any) => isAdmin || p.author_id === user?.id;
+
   const deletePost = (id: string) => {
     Alert.alert("Delete post", "Remove this post for everyone?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete", style: "destructive", onPress: async () => {
           setPosts((prev) => prev.filter((p) => p.id !== id));
-          try { await api(`/admin/community/posts/${id}`, { method: "DELETE" }); } catch { load(filter); }
+          try { await api(`/community/posts/${id}`, { method: "DELETE" }); } catch { load(filter); }
         },
       },
     ]);
+  };
+
+  const startEdit = (p: any) => {
+    setEditingPostId(p.id);
+    setEditDraft(p.body || "");
+    setOpenComments(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingPostId(null);
+    setEditDraft("");
+  };
+
+  const saveEdit = async (id: string) => {
+    const body = editDraft.trim();
+    if (!body || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const post = posts.find((p) => p.id === id);
+      const updated = await api(`/community/posts/${id}`, {
+        method: "PUT",
+        body: { body, attachments: post?.attachments || [] },
+      });
+      setPosts((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      setEditingPostId(null);
+      setEditDraft("");
+    } catch (e: any) {
+      Alert.alert("Error", e.message || "Could not update post");
+    }
+    setSavingEdit(false);
   };
 
   const toggleLike = async (id: string) => {
@@ -331,10 +366,15 @@ export default function Community() {
                         <Text style={styles.postAuthor}>{p.author_name}</Text>
                         <Text style={styles.postMeta}>@{p.author_handle} · {relativeTime(p.created_at)}</Text>
                       </View>
-                      {isAdmin && (
-                        <Pressable testID={`post-menu-${p.id}`} onPress={() => deletePost(p.id)} hitSlop={8} accessibilityLabel="Delete post" accessibilityRole="button">
-                          <Ionicons name="trash-outline" size={16} color={C.textTertiary} />
-                        </Pressable>
+                      {canManage(p) && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                          <Pressable testID={`post-edit-${p.id}`} onPress={() => startEdit(p)} hitSlop={8} accessibilityLabel="Edit post" accessibilityRole="button">
+                            <Ionicons name="pencil-outline" size={16} color={C.textTertiary} />
+                          </Pressable>
+                          <Pressable testID={`post-menu-${p.id}`} onPress={() => deletePost(p.id)} hitSlop={8} accessibilityLabel="Delete post" accessibilityRole="button">
+                            <Ionicons name="trash-outline" size={16} color={C.textTertiary} />
+                          </Pressable>
+                        </View>
                       )}
                     </View>
 
@@ -346,7 +386,42 @@ export default function Community() {
                     )}
 
                     {p.title && <Text style={styles.postTitle}>{p.title}</Text>}
-                    <Text style={styles.postBody}>{p.body}</Text>
+                    {editingPostId === p.id ? (
+                      <View>
+                        <TextInput
+                          testID={`post-edit-input-${p.id}`}
+                          value={editDraft}
+                          onChangeText={setEditDraft}
+                          style={styles.editInput}
+                          multiline
+                          placeholder="Edit your post..."
+                          placeholderTextColor={C.textTertiary}
+                          autoFocus
+                        />
+                        <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                          <Pressable
+                            testID={`post-edit-save-${p.id}`}
+                            onPress={() => saveEdit(p.id)}
+                            disabled={!editDraft.trim() || savingEdit}
+                            style={[styles.editBtn, (!editDraft.trim() || savingEdit) && styles.editBtnDisabled]}
+                          >
+                            {savingEdit
+                              ? <ActivityIndicator color="#FFFFFF" size="small" />
+                              : <Text style={styles.editBtnText}>Save</Text>}
+                          </Pressable>
+                          <Pressable
+                            testID={`post-edit-cancel-${p.id}`}
+                            onPress={cancelEdit}
+                            disabled={savingEdit}
+                            style={styles.editBtnSecondary}
+                          >
+                            <Text style={styles.editBtnSecondaryText}>Cancel</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ) : (
+                      <Text style={styles.postBody}>{p.body}</Text>
+                    )}
 
                     {p.attachments?.map((a: any, i: number) => (
                       <Pressable
@@ -472,9 +547,15 @@ const styles = StyleSheet.create({
   typeBadgeText: { fontSize: 11, fontWeight: "700" },
   postTitle: { color: C.text, fontSize: 16.5, fontWeight: "700", marginTop: 10 },
   postBody: { color: C.text, fontSize: 14.5, lineHeight: 21, marginTop: 6 },
+  editInput: { color: C.text, fontSize: 14.5, lineHeight: 21, marginTop: 6, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 10, minHeight: 80, textAlignVertical: "top" },
+  editBtn: { backgroundColor: C.accent, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, minWidth: 66, alignItems: "center" },
+  editBtnDisabled: { backgroundColor: C.accentSoft },
+  editBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "600" },
+  editBtnSecondary: { backgroundColor: C.bg, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: C.border, alignItems: "center" },
+  editBtnSecondaryText: { color: C.text, fontSize: 14, fontWeight: "600" },
 
   attachmentCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: C.bg, borderRadius: 12, padding: 10, marginTop: 12 },
-  attachmentIcon: { width: 36, height: 36, borderRadius: 8, backgroundColor: "rgba(10,132,255,0.10)", alignItems: "center", justifyContent: "center" },
+  attachmentIcon: { width: 36, height: 36, borderRadius: 8, backgroundColor: C.accentSoft, alignItems: "center", justifyContent: "center" },
   attachmentName: { color: C.text, fontSize: 13.5, fontWeight: "500" },
   attachmentSub: { color: C.textSecondary, fontSize: 11.5, marginTop: 1 },
 
