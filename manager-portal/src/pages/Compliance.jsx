@@ -57,73 +57,79 @@ export default function Compliance() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
-          { key: 'valid', label: 'Valid', color: 'text-green-400 bg-green-500/10' },
-          { key: 'expiring_soon', label: 'Expiring Soon', color: 'text-orange-400 bg-orange-500/10' },
-          { key: 'expired', label: 'Expired', color: 'text-red-400 bg-red-500/10' },
-          { key: 'unknown', label: 'No Licence', color: 'text-slate-400 bg-slate-500/10' },
+          { key: 'valid', label: 'Valid', color: 'text-green-700 bg-green-50 border-green-200 ring-green-500' },
+          { key: 'expiring_soon', label: 'Expiring Soon', color: 'text-orange-700 bg-orange-50 border-orange-200 ring-orange-500' },
+          { key: 'expired', label: 'Expired', color: 'text-red-700 bg-red-50 border-red-200 ring-red-500' },
+          { key: 'unknown', label: 'No Licence', color: 'text-gray-700 bg-gray-50 border-gray-200 ring-gray-900' },
         ].map(({ key, label, color }) => (
           <button key={key} onClick={() => setFilter(filter === key ? 'all' : key)}
-            className={`card text-left transition-all ${filter === key ? 'ring-2 ring-brand-500' : 'hover:border-surface-600'}`}>
-            <p className={`text-2xl font-bold ${color.split(' ')[0]}`}>{statusCount[key] || 0}</p>
-            <p className="text-xs text-slate-400 mt-1">{label}</p>
+            className={`card text-left transition-all border ${filter === key ? `ring-2 ${color.split(' ')[2]}` : 'hover:shadow-md'}`}>
+            <div className={`inline-flex items-center justify-center px-3 py-1.5 rounded-lg font-mono text-xl font-bold mb-2 ${color.split(' ')[0]} ${color.split(' ')[1]}`}>
+              {statusCount[key] || 0}
+            </div>
+            <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">{label}</p>
           </button>
         ))}
       </div>
 
-      <div className="relative mb-5">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)} className="input pl-9" placeholder="Search guards…" />
+      <div className="relative mb-5 w-80">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={search} onChange={e => setSearch(e.target.value)} className="input pl-9 rounded-full shadow-sm" placeholder="Search guards…" />
       </div>
 
       {(statusCount.expired > 0 || statusCount.expiring_soon > 0) && (
-        <div className="mb-5 bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 flex items-center gap-3">
-          <AlertTriangle size={18} className="text-orange-400 flex-shrink-0" />
-          <p className="text-orange-300 text-sm">
-            <strong>{(statusCount.expired || 0) + (statusCount.expiring_soon || 0)}</strong> guards have expired or expiring licences requiring attention.
-          </p>
+        <div className="mb-6 bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+             <AlertTriangle size={20} className="text-orange-600" />
+          </div>
+          <div>
+            <p className="text-orange-900 text-sm font-medium">
+              <strong>{(statusCount.expired || 0) + (statusCount.expiring_soon || 0)}</strong> guards have expired or expiring licences requiring attention.
+            </p>
+          </div>
         </div>
       )}
 
-      {loading ? <div className="text-slate-400 text-sm">Loading…</div> : (
+      {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !filtered.length ? <EmptyState icon={ShieldCheck} title="No records found" /> : (
           <div className="card p-0 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-surface-700/50 border-b border-surface-700">
+                <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>{['Guard', 'Licence #', 'Expiry', 'Days Until Expiry', 'Status', 'Certifications'].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
                 </thead>
-                <tbody className="divide-y divide-surface-700">
+                <tbody className="divide-y divide-gray-100">
                   {filtered.map(r => {
                     const days = r.licence_expiry ? differenceInDays(parseISO(r.licence_expiry), new Date()) : null;
                     return (
-                      <tr key={r.id} className="hover:bg-surface-700/30 transition-colors">
+                      <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className="table-cell">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-brand-500/20 flex items-center justify-center text-brand-400 font-semibold text-xs flex-shrink-0">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-semibold text-sm flex-shrink-0 border border-gray-200">
                               {(r.full_name || '?')[0].toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-white text-sm font-medium">{r.full_name}</p>
-                              <p className="text-slate-400 text-xs">{r.email}</p>
+                              <p className="text-gray-900 text-sm font-medium">{r.full_name}</p>
+                              <p className="text-gray-500 text-xs">{r.email}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="table-cell font-mono text-xs">{r.licence_number || '—'}</td>
-                        <td className="table-cell text-xs">{r.licence_expiry ? format(parseISO(r.licence_expiry), 'MMM d, yyyy') : '—'}</td>
-                        <td className="table-cell text-xs">
+                        <td className="table-cell font-mono text-xs text-gray-600 font-medium">{r.licence_number || '—'}</td>
+                        <td className="table-cell text-xs text-gray-600">{r.licence_expiry ? format(parseISO(r.licence_expiry), 'MMM d, yyyy') : '—'}</td>
+                        <td className="table-cell text-xs font-medium">
                           {days === null ? '—' : (
-                            <span className={days < 0 ? 'text-red-400' : days <= 30 ? 'text-orange-400' : 'text-green-400'}>
+                            <span className={days < 0 ? 'text-red-600' : days <= 30 ? 'text-orange-600' : 'text-green-600'}>
                               {days < 0 ? `${Math.abs(days)}d overdue` : `${days}d`}
                             </span>
                           )}
                         </td>
                         <td className="table-cell"><Badge status={r.licence_status} /></td>
                         <td className="table-cell">
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-2">
                             {(r.certifications || []).map((c, i) => (
-                              <span key={i} className="badge bg-blue-500/15 text-blue-400">{c}</span>
+                              <span key={i} className="badge bg-blue-50 text-blue-700 border border-blue-200">{c}</span>
                             ))}
-                            {!(r.certifications?.length) && <span className="text-slate-500 text-xs">—</span>}
+                            {!(r.certifications?.length) && <span className="text-gray-400 text-xs italic">None</span>}
                           </div>
                         </td>
                       </tr>

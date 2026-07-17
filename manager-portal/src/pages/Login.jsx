@@ -32,26 +32,26 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-500 rounded-2xl mb-4 shadow-lg shadow-brand-500/30">
-            <Bird size={32} className="text-black" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-900 rounded-2xl mb-4 shadow-sm">
+            <Bird size={32} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Skyhawk</h1>
-          <p className="text-slate-400 text-sm mt-1">Manager Portal</p>
+          <h1 className="text-2xl font-bold text-gray-900">Skyhawk</h1>
+          <p className="text-gray-500 text-sm mt-1">Manager Portal</p>
         </div>
 
         {/* Card */}
-        <div className="card space-y-5">
+        <div className="card space-y-5 shadow-sm">
           <div>
-            <h2 className="text-lg font-semibold text-white">Sign in</h2>
-            <p className="text-slate-400 text-sm mt-0.5">Admin credentials required</p>
+            <h2 className="text-lg font-semibold text-gray-900">Sign in</h2>
+            <p className="text-gray-500 text-sm mt-0.5">Admin credentials required</p>
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2.5 text-red-400 text-sm">
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-red-600 text-sm">
               <AlertCircle size={16} className="flex-shrink-0" />
               {error}
             </div>
@@ -61,7 +61,7 @@ export default function Login() {
             <div>
               <label className="label">Email address</label>
               <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="email"
                   value={email}
@@ -77,7 +77,7 @@ export default function Login() {
             <div>
               <label className="label">Password</label>
               <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="password"
                   value={password}
@@ -94,7 +94,7 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="text-xs text-slate-500 text-center">
+          <p className="text-xs text-gray-500 text-center">
             Demo: admin@skyhawk.com / Admin123
           </p>
         </div>

@@ -1,28 +1,28 @@
 const COLORS = {
-  active:       'bg-green-500/15 text-green-400',
-  inactive:     'bg-slate-500/15 text-slate-400',
-  submitted:    'bg-yellow-500/15 text-yellow-400',
-  open:         'bg-blue-500/15 text-blue-400',
-  approved:     'bg-green-500/15 text-green-400',
-  rejected:     'bg-red-500/15 text-red-400',
-  pending:      'bg-yellow-500/15 text-yellow-400',
-  resolved:     'bg-green-500/15 text-green-400',
-  acknowledged: 'bg-blue-500/15 text-blue-400',
-  triggered:    'bg-red-500/15 text-red-400 animate-pulse',
-  under_review: 'bg-purple-500/15 text-purple-400',
-  paid:         'bg-green-500/15 text-green-400',
-  clocked_in:   'bg-green-500/15 text-green-400',
-  clocked_out:  'bg-slate-500/15 text-slate-400',
-  admin:        'bg-brand-500/15 text-brand-400',
-  employee:     'bg-blue-500/15 text-blue-400',
-  expiring_soon:'bg-orange-500/15 text-orange-400',
-  expired:      'bg-red-500/15 text-red-400',
-  valid:        'bg-green-500/15 text-green-400',
+  active:       'bg-green-100 text-green-700',
+  inactive:     'bg-gray-100 text-gray-600',
+  submitted:    'bg-yellow-100 text-yellow-700',
+  open:         'bg-blue-100 text-blue-700',
+  approved:     'bg-green-100 text-green-700',
+  rejected:     'bg-red-100 text-red-700',
+  pending:      'bg-yellow-100 text-yellow-700',
+  resolved:     'bg-green-100 text-green-700',
+  acknowledged: 'bg-blue-100 text-blue-700',
+  triggered:    'bg-red-100 text-red-700 animate-pulse',
+  under_review: 'bg-purple-100 text-purple-700',
+  paid:         'bg-green-100 text-green-700',
+  clocked_in:   'bg-green-100 text-green-700',
+  clocked_out:  'bg-gray-100 text-gray-600',
+  admin:        'bg-gray-900 text-white',
+  employee:     'bg-blue-100 text-blue-700',
+  expiring_soon:'bg-orange-100 text-orange-700',
+  expired:      'bg-red-100 text-red-700',
+  valid:        'bg-green-100 text-green-700',
 };
 
 export default function Badge({ status }) {
   const label = status?.replace(/_/g, ' ') || 'unknown';
-  const cls = COLORS[status] || 'bg-slate-500/15 text-slate-400';
+  const cls = COLORS[status] || 'bg-gray-100 text-gray-600';
   return (
     <span className={`badge ${cls}`}>
       {label}

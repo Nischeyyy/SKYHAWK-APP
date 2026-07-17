@@ -45,12 +45,12 @@ export default function LiveLocations() {
       />
 
       {/* Live indicator */}
-      <div className="flex items-center gap-2 mb-5">
-        <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-        <span className="text-sm text-slate-400">Auto-refreshes every 30 seconds</span>
+      <div className="flex items-center gap-2 mb-6">
+        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+        <span className="text-sm text-gray-500 font-medium">Auto-refreshes every 30 seconds</span>
       </div>
 
-      {loading ? <div className="text-slate-400 text-sm">Loading…</div> : (
+      {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !locations.length ? (
           <EmptyState
             icon={Radio}
@@ -58,27 +58,29 @@ export default function LiveLocations() {
             subtitle="Guards appear here when they send GPS pings while on shift"
           />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {/* Map link prompt */}
-            <div className="card bg-blue-500/5 border-blue-500/20 flex items-center gap-3 mb-4">
-              <MapPin size={18} className="text-blue-400 flex-shrink-0" />
-              <p className="text-slate-300 text-sm flex-1">
+            <div className="card bg-blue-50 border-blue-100 flex items-center gap-4 mb-4 shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <MapPin size={16} className="text-blue-600" />
+              </div>
+              <p className="text-gray-700 text-sm flex-1 font-medium">
                 Click any location to open in Google Maps. Full map integration can be added with a Google Maps API key.
               </p>
             </div>
 
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {locations.map((loc, i) => (
-                <div key={loc.user_id || i} className="card space-y-3">
+                <div key={loc.user_id || i} className="card space-y-4 hover:border-gray-300 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-semibold text-sm flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-700 font-semibold text-sm flex-shrink-0 border border-green-200">
                       {(loc.full_name || loc.user?.full_name || '?')[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-white truncate">{loc.full_name || loc.user?.full_name || 'Unknown'}</p>
-                      {loc.site_name && <p className="text-xs text-slate-400 truncate">{loc.site_name}</p>}
+                      <p className="font-bold text-gray-900 truncate">{loc.full_name || loc.user?.full_name || 'Unknown'}</p>
+                      {loc.site_name && <p className="text-xs text-gray-500 truncate font-medium">{loc.site_name}</p>}
                     </div>
-                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
                   </div>
 
                   {(loc.lat && loc.lng) ? (
@@ -86,25 +88,28 @@ export default function LiveLocations() {
                       href={`https://maps.google.com/?q=${loc.lat},${loc.lng}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block bg-surface-700/50 hover:bg-surface-700 rounded-lg px-3 py-3 transition-colors group"
+                      className="block bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg px-4 py-3 transition-colors group"
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        <MapPin size={14} className="text-brand-400" />
-                        <span className="text-xs text-brand-400 group-hover:text-brand-300">Open in Maps →</span>
+                        <MapPin size={14} className="text-blue-600" />
+                        <span className="text-xs text-blue-600 font-medium group-hover:text-blue-800">Open in Maps →</span>
                       </div>
-                      <p className="font-mono text-xs text-slate-400">{Number(loc.lat).toFixed(5)}, {Number(loc.lng).toFixed(5)}</p>
-                      {loc.accuracy && <p className="text-xs text-slate-500 mt-0.5">±{loc.accuracy}m accuracy</p>}
+                      <p className="font-mono text-xs text-gray-600 font-medium mt-1">{Number(loc.lat).toFixed(5)}, {Number(loc.lng).toFixed(5)}</p>
+                      {loc.accuracy && <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-wider font-semibold">±{loc.accuracy}m accuracy</p>}
                     </a>
                   ) : (
-                    <div className="bg-surface-700/50 rounded-lg px-3 py-2 text-xs text-slate-500">
+                    <div className="bg-gray-50 border border-gray-100 rounded-lg px-4 py-3 text-xs text-gray-500 italic font-medium">
                       No GPS coordinates available
                     </div>
                   )}
 
                   {loc.last_ping && (
-                    <p className="text-xs text-slate-500">
-                      Last ping: {format(parseISO(loc.last_ping), 'HH:mm:ss')}
-                    </p>
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                       <Radio size={12} className="text-gray-400" />
+                       <p className="text-xs text-gray-500 font-medium">
+                         Last ping: <span className="text-gray-900">{format(parseISO(loc.last_ping), 'HH:mm:ss')}</span>
+                       </p>
+                    </div>
                   )}
                 </div>
               ))}

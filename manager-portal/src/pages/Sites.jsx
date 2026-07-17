@@ -3,7 +3,7 @@ import { api } from '../api/client.js';
 import PageHeader from '../components/PageHeader.jsx';
 import Modal from '../components/Modal.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import { MapPin, Plus, Edit2, Trash2 } from 'lucide-react';
+import { MapPin, Plus, Edit2, Trash2, Building } from 'lucide-react';
 
 const EMPTY = { name: '', address: '', city: '', lat: '', lng: '', radius_m: 200, client_name: '', notes: '' };
 
@@ -50,29 +50,42 @@ export default function Sites() {
       <PageHeader title="Sites" subtitle={`${sites.length} client site${sites.length !== 1 ? 's' : ''}`}
         action={<button className="btn-primary flex items-center gap-2" onClick={openCreate}><Plus size={16} /> Add Site</button>} />
 
-      {loading ? <div className="text-slate-400 text-sm">Loading…</div> : (
+      {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !sites.length ? <EmptyState icon={MapPin} title="No sites yet" subtitle="Add your first client site to get started" /> : (
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {sites.map(s => (
-              <div key={s.id} className="card space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <MapPin size={18} className="text-brand-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-white">{s.name}</p>
-                      {s.client_name && <p className="text-xs text-slate-400">{s.client_name}</p>}
+              <div key={s.id} className="card flex flex-col justify-between group hover:border-gray-300 transition-colors cursor-pointer">
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 text-gray-400">
+                        <Building size={20} />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900 leading-tight">{s.name}</p>
+                        {s.client_name && <p className="text-xs text-gray-500 mt-0.5">{s.client_name}</p>}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => openEdit(s)} className="text-gray-400 hover:text-gray-900 p-1.5 rounded transition-colors"><Edit2 size={14} /></button>
+                      <button onClick={() => handleDelete(s)} className="text-gray-400 hover:text-red-500 p-1.5 rounded transition-colors"><Trash2 size={14} /></button>
                     </div>
                   </div>
-                  <div className="flex gap-1 flex-shrink-0">
-                    <button onClick={() => openEdit(s)} className="text-slate-400 hover:text-white p-1 transition-colors"><Edit2 size={14} /></button>
-                    <button onClick={() => handleDelete(s)} className="text-slate-400 hover:text-red-400 p-1 transition-colors"><Trash2 size={14} /></button>
+                  <div className="text-sm text-gray-600 space-y-1.5">
+                    {s.address && (
+                      <div className="flex items-start gap-2">
+                         <MapPin size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                         <p>{s.address}{s.city ? `, ${s.city}` : ''}</p>
+                      </div>
+                    )}
+                    {(s.lat && s.lng) && <p className="font-mono text-xs text-gray-500 pl-6">{Number(s.lat).toFixed(5)}, {Number(s.lng).toFixed(5)} · {s.radius_m}m radius</p>}
                   </div>
                 </div>
-                <div className="text-sm text-slate-400 space-y-1">
-                  {s.address && <p>{s.address}{s.city ? `, ${s.city}` : ''}</p>}
-                  {(s.lat && s.lng) && <p className="font-mono text-xs">{Number(s.lat).toFixed(5)}, {Number(s.lng).toFixed(5)} · {s.radius_m}m radius</p>}
-                  {s.notes && <p className="text-xs text-slate-500 italic">{s.notes}</p>}
-                </div>
+                {s.notes && (
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <p className="text-xs text-gray-500 italic line-clamp-2">{s.notes}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -82,7 +95,7 @@ export default function Sites() {
       {modal && (
         <Modal title={editing ? `Edit — ${editing.name}` : 'Add Site'} onClose={() => setModal(null)}>
           <form onSubmit={handleSave} className="space-y-4">
-            {error && <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
+            {error && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2"><label className="label">Site Name</label><input className="input" value={form.name} onChange={f('name')} required /></div>
               <div className="col-span-2"><label className="label">Client Name</label><input className="input" value={form.client_name} onChange={f('client_name')} /></div>

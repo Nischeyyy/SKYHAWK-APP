@@ -41,35 +41,37 @@ export default function Announcements() {
   const siteMap = Object.fromEntries(sites.map(s => [s.id, s]));
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
-  const priorityBg = { urgent: 'border-red-500/40 bg-red-500/5', high: 'border-orange-500/40 bg-orange-500/5', normal: '' };
+  const priorityBg = { urgent: 'border-red-200 bg-red-50', high: 'border-orange-200 bg-orange-50', normal: 'border-gray-200 bg-white' };
 
   return (
     <div>
       <PageHeader title="Announcements" subtitle="Broadcast messages to guards"
         action={<button className="btn-primary flex items-center gap-2" onClick={() => { setForm(EMPTY); setError(''); setModal(true); }}><Plus size={16} /> New Announcement</button>} />
 
-      {loading ? <div className="text-slate-400 text-sm">Loading…</div> : (
+      {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !announcements.length ? <EmptyState icon={Megaphone} title="No announcements yet" subtitle="Post a message to all guards" /> : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {announcements.map(ann => (
-              <div key={ann.id} className={`card ${priorityBg[ann.priority] || ''}`}>
+              <div key={ann.id} className={`card ${priorityBg[ann.priority] || priorityBg.normal} shadow-sm transition-all hover:shadow-md`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h3 className="font-semibold text-white">{ann.title}</h3>
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                      <h3 className="font-bold text-gray-900 text-lg">{ann.title}</h3>
                       {ann.priority && ann.priority !== 'normal' && (
-                        <span className={`badge ${ann.priority === 'urgent' ? 'bg-red-500/15 text-red-400' : 'bg-orange-500/15 text-orange-400'}`}>
-                          {ann.priority}
+                        <span className={`badge ${ann.priority === 'urgent' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-orange-100 text-orange-700 border border-orange-200'}`}>
+                          {ann.priority.toUpperCase()}
                         </span>
                       )}
-                      {ann.site_id && <span className="badge bg-blue-500/15 text-blue-400">{siteMap[ann.site_id]?.name || 'Site-specific'}</span>}
+                      {ann.site_id && <span className="badge bg-blue-100 text-blue-700 border border-blue-200">{siteMap[ann.site_id]?.name || 'Site-specific'}</span>}
                     </div>
-                    <p className="text-slate-300 text-sm leading-relaxed">{ann.body}</p>
-                    <p className="text-slate-500 text-xs mt-2">
-                      By {ann.posted_by} · {ann.created_at ? format(parseISO(ann.created_at), 'MMM d yyyy, HH:mm') : '—'}
-                    </p>
+                    <p className="text-gray-700 text-sm leading-relaxed mb-4">{ann.body}</p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                      <span>By {ann.posted_by}</span>
+                      <span>·</span>
+                      <span>{ann.created_at ? format(parseISO(ann.created_at), 'MMM d yyyy, HH:mm') : '—'}</span>
+                    </div>
                   </div>
-                  <button onClick={() => handleDelete(ann.id)} className="text-slate-400 hover:text-red-400 p-1 transition-colors flex-shrink-0">
+                  <button onClick={() => handleDelete(ann.id)} className="text-gray-400 hover:text-red-500 p-2 rounded hover:bg-gray-100 transition-colors flex-shrink-0">
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -82,7 +84,7 @@ export default function Announcements() {
       {modal && (
         <Modal title="New Announcement" onClose={() => setModal(false)}>
           <form onSubmit={handleSave} className="space-y-4">
-            {error && <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
+            {error && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
             <div>
               <label className="label">Title</label>
               <input className="input" value={form.title} onChange={f('title')} required placeholder="e.g. Holiday schedule update" />
@@ -103,12 +105,12 @@ export default function Announcements() {
               <div>
                 <label className="label">Target Site (optional)</label>
                 <select className="input" value={form.site_id} onChange={f('site_id')}>
-                  <option value="">All guards</option>
+                  <option value="">All guards (Global)</option>
                   {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
             </div>
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-2">
               <button type="button" className="btn-secondary" onClick={() => setModal(false)}>Cancel</button>
               <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Posting…' : 'Post Announcement'}</button>
             </div>

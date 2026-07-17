@@ -62,7 +62,7 @@ export default function Payroll() {
 
   return (
     <div>
-      <PageHeader title="Payroll" subtitle={`${entries.length} entries · $${totalGross.toFixed(2)} gross`}
+      <PageHeader title="Payroll" subtitle={`${entries.length} entries · ${totalGross.toFixed(2)} gross`}
         action={
           <div className="flex gap-2">
             <button className="btn-secondary flex items-center gap-2" onClick={() => { setCalcForm({ period_start: '', period_end: '', hourly_rate: '' }); setError(''); setCalcModal(true); }}>
@@ -73,40 +73,40 @@ export default function Payroll() {
         }
       />
 
-      <div className="flex gap-2 mb-5 flex-wrap">
+      <div className="flex gap-2 mb-6 flex-wrap">
         {['', 'submitted', 'under_review', 'approved', 'paid'].map(s => (
           <button key={s} onClick={() => setFilterStatus(s)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filterStatus === s ? 'bg-brand-500 text-black' : 'bg-surface-700 text-slate-300 hover:text-white'}`}>
-            {s || 'All'}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${filterStatus === s ? 'bg-gray-900 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+            {s ? s.replace('_', ' ').charAt(0).toUpperCase() + s.replace('_', ' ').slice(1) : 'All'}
           </button>
         ))}
       </div>
 
-      {loading ? <div className="text-slate-400 text-sm">Loading…</div> : (
+      {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !entries.length ? <EmptyState icon={DollarSign} title="No payroll entries" /> : (
           <div className="card p-0 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-surface-700/50 border-b border-surface-700">
+                <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>{['Guard', 'Period', 'Hours', 'Rate', 'Gross Pay', 'Status', ''].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
                 </thead>
-                <tbody className="divide-y divide-surface-700">
+                <tbody className="divide-y divide-gray-100">
                   {entries.map(e => {
                     const gross = e.gross_pay ?? (e.hours_worked * e.hourly_rate);
                     return (
-                      <tr key={e.id} className="hover:bg-surface-700/30 transition-colors">
+                      <tr key={e.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className="table-cell">
-                          <p className="text-white text-sm font-medium">{guardMap[e.user_id]?.full_name || '—'}</p>
+                          <p className="text-gray-900 text-sm font-medium">{guardMap[e.user_id]?.full_name || '—'}</p>
                         </td>
-                        <td className="table-cell text-xs text-slate-400">
+                        <td className="table-cell text-xs text-gray-600">
                           {e.period_start ? format(parseISO(e.period_start), 'MMM d') : '—'} – {e.period_end ? format(parseISO(e.period_end), 'MMM d') : '—'}
                         </td>
                         <td className="table-cell text-sm font-mono">{e.hours_worked?.toFixed(1) ?? '—'}h</td>
                         <td className="table-cell text-sm font-mono">${e.hourly_rate?.toFixed(2) ?? '—'}</td>
-                        <td className="table-cell text-sm font-semibold text-brand-400">${gross?.toFixed(2) ?? '—'}</td>
+                        <td className="table-cell text-sm font-bold text-gray-900">${gross?.toFixed(2) ?? '—'}</td>
                         <td className="table-cell"><Badge status={e.status} /></td>
-                        <td className="table-cell">
-                          <button onClick={() => openEdit(e)} className="text-slate-400 hover:text-white p-1 transition-colors"><Edit2 size={14} /></button>
+                        <td className="table-cell text-right">
+                          <button onClick={() => openEdit(e)} className="text-gray-400 hover:text-gray-900 p-1.5 rounded transition-colors"><Edit2 size={16} /></button>
                         </td>
                       </tr>
                     );
@@ -121,7 +121,7 @@ export default function Payroll() {
       {modal === 'entry' && (
         <Modal title={editing ? 'Edit Payroll Entry' : 'Add Payroll Entry'} onClose={() => setModal(null)}>
           <form onSubmit={handleSave} className="space-y-4">
-            {error && <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
+            {error && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="label">Guard</label>
@@ -137,20 +137,20 @@ export default function Payroll() {
               <div>
                 <label className="label">Status</label>
                 <select className="input" value={form.status} onChange={f('status')}>
-                  {['submitted','under_review','approved','paid','cancelled'].map(s => <option key={s}>{s}</option>)}
+                  {['submitted','under_review','approved','paid','cancelled'].map(s => <option key={s}>{s.replace('_', ' ')}</option>)}
                 </select>
               </div>
               <div className="col-span-2"><label className="label">Notes</label><textarea className="input resize-none" rows={2} value={form.notes} onChange={f('notes')} /></div>
             </div>
             {form.hours_worked && form.hourly_rate && (
-              <div className="bg-brand-500/10 border border-brand-500/30 rounded-lg px-4 py-3 text-sm">
-                <span className="text-slate-400">Gross Pay: </span>
-                <span className="text-brand-400 font-bold text-lg">${(Number(form.hours_worked) * Number(form.hourly_rate)).toFixed(2)}</span>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between">
+                <span className="text-gray-500 font-medium uppercase tracking-wider text-xs">Gross Pay</span>
+                <span className="text-gray-900 font-bold text-xl">${(Number(form.hours_worked) * Number(form.hourly_rate)).toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
               <button type="button" className="btn-secondary" onClick={() => setModal(null)}>Cancel</button>
-              <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save'}</button>
+              <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save Entry'}</button>
             </div>
           </form>
         </Modal>
@@ -159,16 +159,16 @@ export default function Payroll() {
       {calcModal && (
         <Modal title="Calculate Payroll" onClose={() => setCalcModal(false)}>
           <form onSubmit={handleCalculate} className="space-y-4">
-            {error && <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
-            <p className="text-slate-400 text-sm">Auto-calculate payroll for all guards from their timeclock entries for a given period.</p>
+            {error && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+            <p className="text-gray-600 text-sm leading-relaxed mb-2">Auto-calculate payroll for all guards from their timeclock entries for a given period.</p>
             <div className="grid grid-cols-2 gap-4">
               <div><label className="label">Period Start</label><input type="date" className="input" value={calcForm.period_start} onChange={fc('period_start')} required /></div>
               <div><label className="label">Period End</label><input type="date" className="input" value={calcForm.period_end} onChange={fc('period_end')} required /></div>
               <div className="col-span-2"><label className="label">Default Hourly Rate ($)</label><input type="number" step="0.01" className="input" value={calcForm.hourly_rate} onChange={fc('hourly_rate')} /></div>
             </div>
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-2">
               <button type="button" className="btn-secondary" onClick={() => setCalcModal(false)}>Cancel</button>
-              <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Calculating…' : 'Calculate'}</button>
+              <button type="submit" className="btn-primary bg-blue-600 hover:bg-blue-700" disabled={saving}>{saving ? 'Calculating…' : 'Calculate Run'}</button>
             </div>
           </form>
         </Modal>

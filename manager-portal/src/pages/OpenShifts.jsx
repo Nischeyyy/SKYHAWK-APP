@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
 import PageHeader from '../components/PageHeader.jsx';
 import Modal from '../components/Modal.jsx';
-import Badge from '../components/Badge.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import { Briefcase, Plus, Trash2, Users } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -50,30 +49,37 @@ export default function OpenShifts() {
       <PageHeader title="Open Shifts" subtitle="Marketplace for available shifts"
         action={<button className="btn-primary flex items-center gap-2" onClick={() => { setForm(EMPTY); setError(''); setModal(true); }}><Plus size={16} /> Post Shift</button>} />
 
-      {loading ? <div className="text-slate-400 text-sm">Loading…</div> : (
+      {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !shifts.length ? <EmptyState icon={Briefcase} title="No open shifts posted" subtitle="Post a shift for guards to claim" /> : (
           <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {shifts.map(s => (
-              <div key={s.id} className="card space-y-3">
+              <div key={s.id} className="card space-y-4 hover:border-gray-300 transition-colors">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-semibold text-white">{siteMap[s.site_id]?.name || 'Unknown site'}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{s.role}</p>
+                    <p className="font-semibold text-gray-900">{siteMap[s.site_id]?.name || 'Unknown site'}</p>
+                    <p className="text-xs text-gray-500 uppercase tracking-widest mt-1 font-mono">{s.role}</p>
                   </div>
-                  <button onClick={() => handleDelete(s.id)} className="text-slate-400 hover:text-red-400 p-1 transition-colors"><Trash2 size={15} /></button>
+                  <button onClick={() => handleDelete(s.id)} className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors bg-gray-50 hover:bg-red-50"><Trash2 size={16} /></button>
                 </div>
-                <div className="text-sm space-y-1 text-slate-400">
-                  <p>{s.start ? format(parseISO(s.start), 'MMM d, HH:mm') : '—'} → {s.end ? format(parseISO(s.end), 'HH:mm') : '—'}</p>
-                  {s.pay_rate && <p className="text-brand-400 font-medium">${s.pay_rate}/hr</p>}
+                <div className="text-sm space-y-1 text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                  <p className="font-medium text-gray-900">{s.start ? format(parseISO(s.start), 'MMM d, yyyy') : '—'}</p>
+                  <p>{s.start ? format(parseISO(s.start), 'HH:mm') : '—'} → {s.end ? format(parseISO(s.end), 'HH:mm') : '—'}</p>
+                  {s.pay_rate && <p className="text-green-600 font-medium pt-1">${s.pay_rate}/hr</p>}
                 </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <Users size={14} className="text-slate-400" />
-                  <span className="text-slate-400">{s.claimed_by?.length || 0} / {s.slots || 1} claimed</span>
+                <div className="flex items-center gap-2 text-xs font-medium bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full w-fit">
+                  <Users size={14} />
+                  <span>{s.claimed_by?.length || 0} / {s.slots || 1} claimed</span>
                 </div>
                 {s.claimed_by?.length > 0 && (
-                  <div className="space-y-1">
+                  <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Claimed by</p>
                     {s.claimed_by.map(uid => (
-                      <div key={uid} className="text-xs bg-green-500/10 text-green-400 rounded px-2 py-1">{guardMap[uid]?.full_name || uid}</div>
+                      <div key={uid} className="flex items-center gap-2 text-sm text-gray-700">
+                        <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold">
+                           {(guardMap[uid]?.full_name || '?')[0].toUpperCase()}
+                        </div>
+                        {guardMap[uid]?.full_name || uid}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -86,7 +92,7 @@ export default function OpenShifts() {
       {modal && (
         <Modal title="Post Open Shift" onClose={() => setModal(false)}>
           <form onSubmit={handleSave} className="space-y-4">
-            {error && <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
+            {error && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="label">Site</label>

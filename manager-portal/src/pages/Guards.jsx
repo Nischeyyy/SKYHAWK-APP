@@ -84,52 +84,52 @@ export default function Guards() {
       />
 
       {/* Search */}
-      <div className="relative mb-5">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)} className="input pl-9" placeholder="Search by name, email, or employee #…" />
+      <div className="relative mb-5 w-80">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={search} onChange={e => setSearch(e.target.value)} className="input pl-9 rounded-full bg-white shadow-sm" placeholder="Search by name, email, or employee #…" />
       </div>
 
-      {loading ? <div className="text-slate-400 text-sm">Loading…</div> : (
+      {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !filtered.length ? <EmptyState icon={Users} title="No guards found" /> : (
           <div className="card p-0 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-surface-700/50 border-b border-surface-700">
+                <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                     {['Guard', 'Employee #', 'Role', 'Licence', 'Status', 'Joined', ''].map(h => (
                       <th key={h} className="table-head">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-surface-700">
+                <tbody className="divide-y divide-gray-100">
                   {filtered.map(g => (
-                    <tr key={g.id} className="hover:bg-surface-700/30 transition-colors">
+                    <tr key={g.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="table-cell">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-brand-500/20 flex items-center justify-center text-brand-400 font-semibold text-sm flex-shrink-0">
+                          <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 font-semibold text-sm flex-shrink-0">
                             {(g.full_name || '?')[0].toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-white font-medium text-sm">{g.full_name}</p>
-                            <p className="text-slate-400 text-xs">{g.email}</p>
+                            <p className="text-gray-900 font-medium text-sm">{g.full_name}</p>
+                            <p className="text-gray-500 text-xs">{g.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="table-cell font-mono text-xs">{g.employee_number || '—'}</td>
+                      <td className="table-cell font-mono text-xs text-gray-600">{g.employee_number || '—'}</td>
                       <td className="table-cell"><Badge status={g.role} /></td>
-                      <td className="table-cell text-xs">
+                      <td className="table-cell text-xs text-gray-600">
                         {g.licence_number ? (
                           <div>
-                            <p>{g.licence_number}</p>
-                            {g.licence_expiry && <p className="text-slate-500">{g.licence_expiry}</p>}
+                            <p className="font-medium text-gray-900">{g.licence_number}</p>
+                            {g.licence_expiry && <p className="text-gray-500">{g.licence_expiry}</p>}
                           </div>
                         ) : '—'}
                       </td>
                       <td className="table-cell"><Badge status={g.employment_status || 'active'} /></td>
-                      <td className="table-cell text-xs">{g.created_at ? format(new Date(g.created_at), 'MMM d, yyyy') : '—'}</td>
-                      <td className="table-cell">
-                        <button onClick={() => openEdit(g)} className="text-slate-400 hover:text-white transition-colors p-1">
-                          <Edit2 size={15} />
+                      <td className="table-cell text-xs text-gray-500">{g.created_at ? format(new Date(g.created_at), 'MMM d, yyyy') : '—'}</td>
+                      <td className="table-cell text-right">
+                        <button onClick={() => openEdit(g)} className="text-gray-400 hover:text-gray-900 transition-colors p-1">
+                          <Edit2 size={16} />
                         </button>
                       </td>
                     </tr>
@@ -144,7 +144,7 @@ export default function Guards() {
       {modal && (
         <Modal title={modal === 'create' ? 'Add Guard' : `Edit — ${editing?.full_name}`} onClose={() => setModal(null)}>
           <form onSubmit={handleSave} className="space-y-4">
-            {error && <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
+            {error && <p className="text-red-600 text-sm bg-red-50 rounded-lg px-3 py-2 border border-red-200">{error}</p>}
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="label">Full Name</label>

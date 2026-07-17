@@ -48,22 +48,27 @@ export default function SosAlerts() {
       <PageHeader title="SOS Alerts" subtitle={active.length > 0 ? `⚠ ${active.length} active alert${active.length > 1 ? 's' : ''}` : 'No active alerts'} />
 
       {active.length > 0 && (
-        <div className="mb-5 bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
-          <AlertTriangle size={20} className="text-red-400 flex-shrink-0 animate-pulse" />
-          <p className="text-red-300 font-medium">{active.length} guard{active.length > 1 ? 's need' : ' needs'} immediate attention</p>
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-4 shadow-sm">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 animate-pulse">
+            <AlertTriangle size={20} className="text-red-600" />
+          </div>
+          <div>
+            <p className="text-red-900 font-bold text-lg">{active.length} guard{active.length > 1 ? 's need' : ' needs'} immediate attention</p>
+            <p className="text-red-700 text-sm">Please review and acknowledge alerts below immediately.</p>
+          </div>
         </div>
       )}
 
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-6">
         {['active', 'history'].map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${tab === t ? 'bg-brand-500 text-black' : 'bg-surface-700 text-slate-300 hover:text-white'}`}>
-            {t === 'active' ? `Active (${active.length})` : 'History'}
+            className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${tab === t ? 'bg-gray-900 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+            {t === 'active' ? `Active Alerts (${active.length})` : 'Resolved History'}
           </button>
         ))}
       </div>
 
-      {loading ? <div className="text-slate-400 text-sm">Loading…</div> : (
+      {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !list.length ? (
           <EmptyState
             icon={AlertTriangle}
@@ -71,50 +76,48 @@ export default function SosAlerts() {
             subtitle={tab === 'active' ? 'All guards are safe' : 'Past alerts will appear here'}
           />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {list.map(alert => (
-              <div key={alert.id} className={`card ${alert.status === 'triggered' ? 'border-red-500/50 bg-red-500/5' : ''}`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      alert.status === 'triggered' ? 'bg-red-500/20' : alert.status === 'acknowledged' ? 'bg-blue-500/20' : 'bg-green-500/20'
+              <div key={alert.id} className={`card ${alert.status === 'triggered' ? 'border-red-300 bg-red-50/50 shadow-md ring-1 ring-red-500/20' : 'hover:border-gray-300'}`}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      alert.status === 'triggered' ? 'bg-red-100 text-red-600' : alert.status === 'acknowledged' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'
                     }`}>
-                      <AlertTriangle size={18} className={
-                        alert.status === 'triggered' ? 'text-red-400' : alert.status === 'acknowledged' ? 'text-blue-400' : 'text-green-400'
-                      } />
+                      <AlertTriangle size={24} />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-white">{guardMap[alert.user_id]?.full_name || 'Unknown Guard'}</p>
+                      <div className="flex items-center gap-3 mb-1.5">
+                        <p className="font-bold text-gray-900 text-lg">{guardMap[alert.user_id]?.full_name || 'Unknown Guard'}</p>
                         <Badge status={alert.status} />
                       </div>
-                      {alert.message && <p className="text-slate-300 text-sm mb-2">{alert.message}</p>}
-                      <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-                        <span>Triggered: {alert.triggered_at ? format(parseISO(alert.triggered_at), 'MMM d, HH:mm:ss') : '—'}</span>
+                      {alert.message && <p className="text-gray-700 text-sm mb-3 bg-white/50 inline-block px-3 py-1.5 rounded-lg border border-gray-100 font-medium">"{alert.message}"</p>}
+                      <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500 font-mono">
+                        <span>Triggered: <strong className="text-gray-700">{alert.triggered_at ? format(parseISO(alert.triggered_at), 'MMM d, HH:mm:ss') : '—'}</strong></span>
+                        {alert.acknowledged_at && <span>Ack'd: <strong className="text-gray-700">{format(parseISO(alert.acknowledged_at), 'HH:mm:ss')}</strong></span>}
+                        {alert.resolved_at && <span>Resolved: <strong className="text-gray-700">{format(parseISO(alert.resolved_at), 'HH:mm:ss')}</strong></span>}
                         {alert.lat && alert.lng && (
                           <a href={`https://maps.google.com/?q=${alert.lat},${alert.lng}`} target="_blank" rel="noopener noreferrer"
-                            className="text-brand-400 hover:text-brand-300 underline">
+                            className="text-blue-600 hover:text-blue-800 underline font-sans font-medium flex items-center gap-1 before:content-['•'] before:text-gray-300 before:no-underline">
                             View on map
                           </a>
                         )}
-                        {alert.acknowledged_at && <span>Acknowledged: {format(parseISO(alert.acknowledged_at), 'HH:mm:ss')}</span>}
-                        {alert.resolved_at && <span>Resolved: {format(parseISO(alert.resolved_at), 'HH:mm:ss')}</span>}
                       </div>
                     </div>
                   </div>
 
                   {tab === 'active' && (
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex gap-2 flex-shrink-0 w-full sm:w-auto mt-2 sm:mt-0 pt-3 sm:pt-0 border-t border-gray-100 sm:border-0">
                       {alert.status === 'triggered' && (
                         <button onClick={() => ack(alert.id)} disabled={acting === alert.id}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors">
-                          <Check size={14} /> Acknowledge
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium border border-blue-200">
+                          <Check size={16} /> Acknowledge
                         </button>
                       )}
                       {(alert.status === 'triggered' || alert.status === 'acknowledged') && (
                         <button onClick={() => resolve(alert.id)} disabled={acting === alert.id}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors">
-                          <CheckCheck size={14} /> Resolve
+                          className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm bg-green-50 text-green-700 hover:bg-green-100 transition-colors font-medium border border-green-200">
+                          <CheckCheck size={16} /> Mark Resolved
                         </button>
                       )}
                     </div>
