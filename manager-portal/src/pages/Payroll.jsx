@@ -45,6 +45,7 @@ export default function Payroll() {
   const [guardSearchText, setGuardSearchText] = useState('');
   const [sortKey, setSortKey] = useState('period_start');
   const [sortDir, setSortDir] = useState('desc');
+  const [searchText, setSearchText] = useState('');
 
   // ── Timesheet import ──
   const [importStage, setImportStage] = useState(null); // null | 'upload' | 'preview' | 'done'
@@ -211,6 +212,19 @@ export default function Payroll() {
   // ── Filtered + sorted entries ──
   const displayedEntries = [...entries]
     .filter(e => !filterGuardId || e.user_id === filterGuardId)
+    .filter(e => {
+      if (!searchText) return true;
+      const q = searchText.toLowerCase();
+      return (
+        (guardMap[e.user_id]?.full_name || '').toLowerCase().includes(q) ||
+        (e.user_name || '').toLowerCase().includes(q) ||
+        (e.notes || '').toLowerCase().includes(q) ||
+        (e.status || '').toLowerCase().includes(q) ||
+        (e.period_start || '').includes(q) ||
+        (e.period_end || '').includes(q) ||
+        (e.paid_via || '').toLowerCase().includes(q)
+      );
+    })
     .sort((a, b) => {
       let av, bv;
       switch (sortKey) {
@@ -373,6 +387,23 @@ export default function Payroll() {
                 </div>
               )}
             </div>
+          )}
+        </div>
+
+        {/* Search bar */}
+        <div className="relative flex-1 min-w-48 max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search by guard, status, notes…"
+            className="input pl-8 py-2 text-sm"
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+          />
+          {searchText && (
+            <button onClick={() => setSearchText('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+              <X size={13} />
+            </button>
           )}
         </div>
 
