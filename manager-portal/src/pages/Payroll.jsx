@@ -29,7 +29,11 @@ export default function Payroll() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [calcModal, setCalcModal] = useState(false);
-  const [calcForm, setCalcForm] = useState({ period_start: '', period_end: '', hourly_rate: '' });
+  const [calcForm, setCalcForm] = useState({ period_start: '', period_end: '', pay_date: '', hourly_rate: '' });
+  const [calcMode, setCalcMode] = useState('all'); // 'all' | 'single'
+  const [calcGuardSearch, setCalcGuardSearch] = useState('');
+  const [calcGuardId, setCalcGuardId] = useState('');
+  const [calcProgress, setCalcProgress] = useState(null); // null | { done, total, errors }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -156,12 +160,34 @@ export default function Payroll() {
   }
 
   async function handleCalculate(e) {
-    e.preventDefault(); setSaving(true); setError('');
+    e.preventDefault(); setSaving(true); setError(''); setCalcProgress(null);
+    const base = {
+      period_start: calcForm.period_start,
+      period_end: calcForm.period_end,
+      pay_date: calcForm.pay_date || calcForm.period_end,
+      hourly_rate: Number(calcForm.hourly_rate) || 25,
+    };
     try {
-      const res = await api.calculatePayroll({ ...calcForm, hourly_rate: calcForm.hourly_rate ? Number(calcForm.hourly_rate) : undefined });
-      alert(`Payroll calculated: ${res.processed || 0} entries created.`);
-      setCalcModal(false); await load();
-    } catch (err) { setError(err.message); } finally { setSaving(false); }
+      if (calcMode === 'single') {
+        if (!calcGuardId) { setError('Please select a guard.'); setSaving(false); return; }
+        await api.calculatePayroll({ ...base, user_id: calcGuardId });
+        setCalcModal(false); await load();
+      } else {
+        // All guards — iterate sequentially
+        const targetGuards = guards;
+        let done = 0, errors = 0;
+        setCalcProgress({ done: 0, total: targetGuards.length, errors: 0 });
+        for (const g of targetGuards) {
+          try {
+            await api.calculatePayroll({ ...base, user_id: g.id });
+          } catch (_) { errors++; }
+          done++;
+          setCalcProgress({ done, total: targetGuards.length, errors });
+        }
+        setCalcModal(false);
+        await load();
+      }
+    } catch (err) { setError(err.message); } finally { setSaving(false); setCalcProgress(null); }
   }
 
   const guardMap = Object.fromEntries(guards.map(g => [g.id, g]));
@@ -588,23 +614,116 @@ export default function Payroll() {
         </Modal>
       )}
 
-      {calcModal && (
-        <Modal title="Calculate Payroll" onClose={() => setCalcModal(false)}>
-          <form onSubmit={handleCalculate} className="space-y-4">
-            {error && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
-            <p className="text-gray-600 text-sm leading-relaxed mb-2">Auto-calculate payroll for all guards from their timeclock entries for a given period.</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="label">Period Start</label><input type="date" className="input" value={calcForm.period_start} onChange={fc('period_start')} required /></div>
-              <div><label className="label">Period End</label><input type="date" className="input" value={calcForm.period_end} onChange={fc('period_end')} required /></div>
-              <div className="col-span-2"><label className="label">Default Hourly Rate ($)</label><input type="number" step="0.01" className="input" value={calcForm.hourly_rate} onChange={fc('hourly_rate')} /></div>
-            </div>
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-2">
-              <button type="button" className="btn-secondary" onClick={() => setCalcModal(false)}>Cancel</button>
-              <button type="submit" className="btn-primary bg-blue-600 hover:bg-blue-700" disabled={saving}>{saving ? 'Calculating…' : 'Calculate Run'}</button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      {calcModal && (() => {
+        const filteredCalcGuards = guards.filter(g =>
+          !calcGuardSearch || g.full_name?.toLowerCase().includes(calcGuardSearch.toLowerCase())
+        );
+        const selectedGuard = guards.find(g => g.id === calcGuardId);
+        return (
+          <Modal title="Calculate Payroll" onClose={() => setCalcModal(false)}>
+            <form onSubmit={handleCalculate} className="space-y-4">
+              {error && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+
+              {/* Mode toggle */}
+              <div>
+                <label className="label">Scope</label>
+                <div className="flex rounded-xl border border-gray-200 overflow-hidden">
+                  {[['all', 'All Guards'], ['single', 'Single Guard']].map(([val, label]) => (
+                    <button key={val} type="button"
+                      onClick={() => { setCalcMode(val); setCalcGuardId(''); setCalcGuardSearch(''); }}
+                      className={`flex-1 py-2 text-sm font-medium transition-colors ${calcMode === val ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {calcMode === 'all'
+                    ? 'Calculates a payroll entry for every guard from their timeclock records.'
+                    : 'Search for one guard and calculate their payroll for the period.'}
+                </p>
+              </div>
+
+              {/* Single-guard search */}
+              {calcMode === 'single' && (
+                <div className="relative">
+                  <label className="label">Guard</label>
+                  {selectedGuard ? (
+                    <div className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-2.5 bg-gray-50">
+                      <span className="text-gray-900 font-medium text-sm">{selectedGuard.full_name}</span>
+                      <button type="button" onClick={() => { setCalcGuardId(''); setCalcGuardSearch(''); }}
+                        className="text-gray-400 hover:text-gray-700 text-xs underline">Change</button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search guard by name…"
+                        className="input pl-8"
+                        value={calcGuardSearch}
+                        onChange={e => setCalcGuardSearch(e.target.value)}
+                        autoComplete="off"
+                      />
+                      {calcGuardSearch && (
+                        <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                          {filteredCalcGuards.length === 0
+                            ? <p className="px-4 py-3 text-sm text-gray-400">No guards found</p>
+                            : filteredCalcGuards.map(g => (
+                              <button key={g.id} type="button"
+                                onClick={() => { setCalcGuardId(g.id); setCalcGuardSearch(''); }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
+                                {g.full_name}
+                              </button>
+                            ))
+                          }
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Period + rate */}
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="label">Period Start</label><input type="date" className="input" value={calcForm.period_start} onChange={fc('period_start')} required /></div>
+                <div><label className="label">Period End</label><input type="date" className="input" value={calcForm.period_end} onChange={fc('period_end')} required /></div>
+                <div><label className="label">Pay Date <span className="text-gray-400 font-normal">(optional)</span></label><input type="date" className="input" value={calcForm.pay_date} onChange={fc('pay_date')} /></div>
+                <div>
+                  <label className="label">Hourly Rate ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                    <input type="number" step="0.01" min="0.01" className="input pl-6" value={calcForm.hourly_rate} onChange={fc('hourly_rate')} required />
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress bar when running all-guards */}
+              {calcProgress && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 space-y-2">
+                  <div className="flex justify-between text-xs text-gray-600 font-medium">
+                    <span>Processing guards…</span>
+                    <span>{calcProgress.done} / {calcProgress.total}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-blue-600 h-2 rounded-full transition-all duration-200"
+                      style={{ width: `${(calcProgress.done / calcProgress.total) * 100}%` }} />
+                  </div>
+                  {calcProgress.errors > 0 && (
+                    <p className="text-xs text-amber-600">{calcProgress.errors} guard{calcProgress.errors !== 1 ? 's' : ''} skipped (no timeclock data)</p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-2">
+                <button type="button" className="btn-secondary" onClick={() => setCalcModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary bg-blue-600 hover:bg-blue-700" disabled={saving}>
+                  {saving ? (calcMode === 'all' ? 'Calculating…' : 'Calculating…') : 'Calculate Run'}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }
