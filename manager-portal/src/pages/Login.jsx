@@ -21,7 +21,7 @@ export default function Login() {
         setLoading(false);
         return;
       }
-      localStorage.setItem('mgr_token', data.token);
+      localStorage.setItem('mgr_token', data.access_token);
       localStorage.setItem('mgr_user', JSON.stringify(data.user));
       navigate('/dashboard', { replace: true });
     } catch (err) {
