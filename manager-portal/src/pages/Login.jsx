@@ -95,7 +95,7 @@ export default function Login() {
           </form>
 
           <p className="text-xs text-slate-500 text-center">
-            Demo: admin@skyhawk.com / Password123
+            Demo: admin@skyhawk.com / Admin123
           </p>
         </div>
       </div>

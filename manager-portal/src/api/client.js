@@ -16,7 +16,7 @@ async function request(method, path, body, formData) {
     body: formData ? formData : body ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401) {
+  if (res.status === 401 && path !== '/auth/login') {
     localStorage.removeItem('mgr_token');
     localStorage.removeItem('mgr_user');
     window.location.href = '/manager';
