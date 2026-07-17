@@ -91,6 +91,8 @@ export const api = {
   calculatePayroll: (body) => request('POST', '/admin/payroll/calculate', body),
   parseTimesheet: (formData, params = '') => request('POST', `/admin/payroll/parse-timesheet${params ? `?${params}` : ''}`, null, formData),
   bulkCreatePayroll: (entries) => request('POST', '/admin/payroll/bulk-create', entries),
+  deletePayroll: (id) => request('DELETE', `/admin/payroll/${id}`),
+  bulkDeletePayroll: (ids) => Promise.all(ids.map(id => request('DELETE', `/admin/payroll/${id}`))),
   payrollStub: (id) => request('GET', `/payroll/${id}/stub`),
 
   // Announcements

@@ -2298,6 +2298,13 @@ async def admin_update_payroll(payroll_id: str, body: AdminUpdatePayrollIn, admi
     return updated
 
 
+@api.delete("/admin/payroll/{payroll_id}", status_code=204)
+async def admin_delete_payroll(payroll_id: str, admin=Depends(require_admin)):
+    r = await db.payroll.delete_one({"id": payroll_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Payroll record not found")
+
+
 # ============================================================
 # ADMIN ROUTES — Timeclock
 # ============================================================

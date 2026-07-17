@@ -72,6 +72,17 @@ export default function Payroll() {
       setSelectedIds(new Set());
     } finally { setBulkSaving(false); }
   }
+  async function bulkDelete() {
+    if (!selectedIds.size) return;
+    const count = selectedIds.size;
+    if (!window.confirm(`Delete ${count} payroll ${count === 1 ? 'entry' : 'entries'}? This cannot be undone.`)) return;
+    setBulkSaving(true);
+    try {
+      await api.bulkDeletePayroll([...selectedIds]);
+      await load();
+      setSelectedIds(new Set());
+    } finally { setBulkSaving(false); }
+  }
   function bulkExportExcel() {
     const rows = displayedEntries.filter(e => selectedIds.has(e.id));
     const ws = XLSX.utils.json_to_sheet(rows.map(e => ({
@@ -564,13 +575,11 @@ export default function Payroll() {
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                     {/* Bulk checkbox */}
-                    {features.bulk && (
-                      <th className="table-head w-10">
-                        <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
-                          checked={selectedIds.size === displayedEntries.length && displayedEntries.length > 0}
-                          onChange={toggleSelectAll} />
-                      </th>
-                    )}
+                    <th className="table-head w-10">
+                      <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
+                        checked={selectedIds.size === displayedEntries.length && displayedEntries.length > 0}
+                        onChange={toggleSelectAll} />
+                    </th>
                     {[
                       { label: 'Guard',      key: 'guard' },
                       { label: 'Period',     key: 'period_start' },
@@ -607,18 +616,16 @@ export default function Payroll() {
                     const paidViaLabel = PAID_VIA_OPTIONS.find(o => o.value === e.paid_via)?.label || '—';
                     const isAnomaly  = features.anomaly  && anomalyIds.has(e.id);
                     const isOverlap  = features.overlap  && overlapIds.has(e.id);
-                    const isSelected = features.bulk     && selectedIds.has(e.id);
+                    const isSelected = selectedIds.has(e.id);
                     return (
                       <tr key={e.id}
                         className={`transition-colors ${isSelected ? 'bg-gray-900/5' : isAnomaly ? 'bg-amber-50 hover:bg-amber-100/60' : isOverlap ? 'bg-red-50 hover:bg-red-100/60' : 'hover:bg-gray-50/50'}`}>
 
                         {/* Bulk checkbox */}
-                        {features.bulk && (
-                          <td className="table-cell">
-                            <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
-                              checked={isSelected} onChange={() => toggleSelect(e.id)} />
-                          </td>
-                        )}
+                        <td className="table-cell">
+                          <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
+                            checked={isSelected} onChange={() => toggleSelect(e.id)} />
+                        </td>
 
                         <td className="table-cell">
                           <div className="flex items-center gap-2">
@@ -660,7 +667,7 @@ export default function Payroll() {
       )}
 
       {/* ── Bulk action bar ── */}
-      {features.bulk && selectedIds.size > 0 && (
+      {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/10">
           <span className="text-sm font-semibold">{selectedIds.size} selected</span>
           <div className="w-px h-5 bg-white/20" />
@@ -679,6 +686,11 @@ export default function Payroll() {
           <button onClick={exportExcel}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
             <Download size={14} /> Export
+          </button>
+          <div className="w-px h-5 bg-white/20" />
+          <button disabled={bulkSaving} onClick={bulkDelete}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50">
+            <Trash2 size={14} /> Delete
           </button>
           <button onClick={() => setSelectedIds(new Set())}
             className="ml-1 text-white/50 hover:text-white transition-colors">
