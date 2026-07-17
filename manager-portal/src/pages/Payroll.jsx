@@ -302,15 +302,12 @@ export default function Payroll() {
         action={
           <div className="flex gap-2 flex-wrap">
             {/* Export buttons */}
-            <div className="flex gap-1 border border-gray-200 rounded-xl overflow-hidden">
-              <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors bg-white" onClick={exportExcel} title="Export as Excel">
-                <FileDown size={15} className="text-green-600" /> Excel
-              </button>
-              <div className="w-px bg-gray-200" />
-              <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors bg-white" onClick={exportPDF} title="Export as PDF">
-                <FileDown size={15} className="text-red-500" /> PDF
-              </button>
-            </div>
+            <button className="btn-primary flex items-center gap-1.5" onClick={exportExcel}>
+              <FileDown size={15} /> Excel
+            </button>
+            <button className="btn-primary flex items-center gap-1.5" onClick={exportPDF}>
+              <FileDown size={15} /> PDF
+            </button>
             <button className="btn-secondary flex items-center gap-2" onClick={openImport}>
               <Upload size={16} /> Import Timesheet
             </button>
