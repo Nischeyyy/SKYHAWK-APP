@@ -4,8 +4,11 @@ import PageHeader from '../components/PageHeader.jsx';
 import Badge from '../components/Badge.jsx';
 import Modal from '../components/Modal.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import { DollarSign, Plus, Edit2, Calculator, Trash2, Upload, FileSpreadsheet, CheckCircle2, XCircle, Search, Users } from 'lucide-react';
+import { DollarSign, Plus, Edit2, Calculator, Trash2, Upload, FileSpreadsheet, CheckCircle2, XCircle, Search, Users, FileDown, ChevronUp, ChevronDown, ChevronsUpDown, Filter, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const PAID_VIA_OPTIONS = [
   { value: '', label: '— Select method —' },
@@ -37,6 +40,11 @@ export default function Payroll() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterGuardId, setFilterGuardId] = useState('');
+  const [guardSearchOpen, setGuardSearchOpen] = useState(false);
+  const [guardSearchText, setGuardSearchText] = useState('');
+  const [sortKey, setSortKey] = useState('period_start');
+  const [sortDir, setSortDir] = useState('desc');
 
   // ── Timesheet import ──
   const [importStage, setImportStage] = useState(null); // null | 'upload' | 'preview' | 'done'
@@ -194,17 +202,119 @@ export default function Payroll() {
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
   const fc = (k) => (e) => setCalcForm(p => ({ ...p, [k]: e.target.value }));
 
-  const totalGross = entries.reduce((sum, e) => sum + (e.gross ?? e.gross_pay ?? (e.hours_regular || e.hours_worked || 0) * (e.pay_rate || e.hourly_rate || 0)), 0);
+  // ── Sort toggle ──
+  function toggleSort(key) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  }
+
+  // ── Filtered + sorted entries ──
+  const displayedEntries = [...entries]
+    .filter(e => !filterGuardId || e.user_id === filterGuardId)
+    .sort((a, b) => {
+      let av, bv;
+      switch (sortKey) {
+        case 'guard':      av = guardMap[a.user_id]?.full_name || ''; bv = guardMap[b.user_id]?.full_name || ''; break;
+        case 'period_start': av = a.period_start || ''; bv = b.period_start || ''; break;
+        case 'hours':      av = a.hours_regular ?? a.hours_worked ?? 0; bv = b.hours_regular ?? b.hours_worked ?? 0; break;
+        case 'rate':       av = a.pay_rate ?? a.hourly_rate ?? 0; bv = b.pay_rate ?? b.hourly_rate ?? 0; break;
+        case 'gross': {
+          const ag = a.gross ?? a.gross_pay ?? ((a.hours_regular ?? 0) * (a.pay_rate ?? 0));
+          const bg = b.gross ?? b.gross_pay ?? ((b.hours_regular ?? 0) * (b.pay_rate ?? 0));
+          av = ag; bv = bg; break;
+        }
+        case 'net': {
+          const ag = a.gross ?? a.gross_pay ?? ((a.hours_regular ?? 0) * (a.pay_rate ?? 0));
+          const bg = b.gross ?? b.gross_pay ?? ((b.hours_regular ?? 0) * (b.pay_rate ?? 0));
+          const ad = a.total_deductions ?? (a.deductions||[]).reduce((s,d)=>s+(d.amount||0),0);
+          const bd = b.total_deductions ?? (b.deductions||[]).reduce((s,d)=>s+(d.amount||0),0);
+          av = a.net ?? (ag - ad); bv = b.net ?? (bg - bd); break;
+        }
+        case 'status':    av = a.status || ''; bv = b.status || ''; break;
+        default:           av = a.period_start || ''; bv = b.period_start || '';
+      }
+      if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      return sortDir === 'asc' ? av - bv : bv - av;
+    });
+
+  const totalGross = displayedEntries.reduce((sum, e) => sum + (e.gross ?? e.gross_pay ?? (e.hours_regular || e.hours_worked || 0) * (e.pay_rate || e.hourly_rate || 0)), 0);
+
+  // ── Export helpers ──
+  function buildExportRows() {
+    return displayedEntries.map(e => {
+      const hrs  = e.hours_regular ?? e.hours_worked ?? 0;
+      const rate = e.pay_rate ?? e.hourly_rate ?? 0;
+      const gross = e.gross ?? e.gross_pay ?? (hrs * rate);
+      const ded   = e.total_deductions ?? (e.deductions||[]).reduce((s,d)=>s+(d.amount||0),0);
+      const net   = e.net ?? (gross - ded);
+      return {
+        Guard:       guardMap[e.user_id]?.full_name || e.user_name || '—',
+        'Period Start': e.period_start ? e.period_start.slice(0,10) : '—',
+        'Period End':   e.period_end   ? e.period_end.slice(0,10)   : '—',
+        'Reg Hours':  +hrs.toFixed(2),
+        'OT Hours':   +(e.hours_overtime ?? 0).toFixed(2),
+        'Rate ($/hr)': +rate.toFixed(2),
+        'Gross ($)':   +gross.toFixed(2),
+        'Deductions ($)': +ded.toFixed(2),
+        'Net Pay ($)':    +net.toFixed(2),
+        'Paid Via': PAID_VIA_OPTIONS.find(o=>o.value===e.paid_via)?.label || '—',
+        Status:      e.status || '—',
+        Notes:       e.notes || '',
+      };
+    });
+  }
+
+  function exportExcel() {
+    const rows = buildExportRows();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Payroll');
+    XLSX.writeFile(wb, `payroll-export-${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+
+  function exportPDF() {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const guardLabel = filterGuardId ? (guardMap[filterGuardId]?.full_name || 'Guard') : 'All Guards';
+    const statusLabel = filterStatus ? filterStatus.replace(/_/g,' ') : 'All Statuses';
+    doc.setFontSize(14);
+    doc.text('Payroll Report', 14, 14);
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(`${guardLabel} · ${statusLabel} · ${displayedEntries.length} entries · ${totalGross.toFixed(2)} gross`, 14, 21);
+    doc.text(`Exported: ${new Date().toLocaleString()}`, 14, 27);
+    const rows = buildExportRows();
+    autoTable(doc, {
+      startY: 32,
+      head: [Object.keys(rows[0] || {})],
+      body: rows.map(r => Object.values(r)),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [17, 24, 39], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [249, 250, 251] },
+    });
+    doc.save(`payroll-export-${new Date().toISOString().slice(0,10)}.pdf`);
+  }
 
   return (
     <div>
-      <PageHeader title="Payroll" subtitle={`${entries.length} entries · ${totalGross.toFixed(2)} gross`}
+      <PageHeader
+        title="Payroll"
+        subtitle={`${displayedEntries.length}${displayedEntries.length !== entries.length ? ` of ${entries.length}` : ''} entries · ${totalGross.toFixed(2)} gross`}
         action={
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {/* Export buttons */}
+            <div className="flex gap-1 border border-gray-200 rounded-xl overflow-hidden">
+              <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors bg-white" onClick={exportExcel} title="Export as Excel">
+                <FileDown size={15} className="text-green-600" /> Excel
+              </button>
+              <div className="w-px bg-gray-200" />
+              <button className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors bg-white" onClick={exportPDF} title="Export as PDF">
+                <FileDown size={15} className="text-red-500" /> PDF
+              </button>
+            </div>
             <button className="btn-secondary flex items-center gap-2" onClick={openImport}>
               <Upload size={16} /> Import Timesheet
             </button>
-            <button className="btn-secondary flex items-center gap-2" onClick={() => { setCalcForm({ period_start: '', period_end: '', hourly_rate: '' }); setError(''); setCalcModal(true); }}>
+            <button className="btn-secondary flex items-center gap-2" onClick={() => { setCalcForm({ period_start: '', period_end: '', pay_date: '', hourly_rate: '' }); setError(''); setCalcModal(true); }}>
               <Calculator size={16} /> Calculate
             </button>
             <button className="btn-primary flex items-center gap-2" onClick={openCreate}><Plus size={16} /> Add Entry</button>
@@ -212,7 +322,8 @@ export default function Payroll() {
         }
       />
 
-      <div className="flex gap-2 mb-6 flex-wrap">
+      {/* ── Status pills ── */}
+      <div className="flex gap-2 mb-4 flex-wrap">
         {['', 'submitted', 'under_review', 'approved', 'paid'].map(s => (
           <button key={s} onClick={() => setFilterStatus(s)}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${filterStatus === s ? 'bg-gray-900 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
@@ -221,16 +332,111 @@ export default function Payroll() {
         ))}
       </div>
 
+      {/* ── Guard filter + sort bar ── */}
+      <div className="flex gap-3 mb-5 flex-wrap items-center">
+        {/* Guard picker */}
+        <div className="relative">
+          {filterGuardId ? (
+            <div className="flex items-center gap-2 border border-blue-300 bg-blue-50 rounded-xl px-3 py-2">
+              <Users size={14} className="text-blue-600" />
+              <span className="text-sm font-medium text-blue-800">{guardMap[filterGuardId]?.full_name}</span>
+              <button onClick={() => { setFilterGuardId(''); setGuardSearchText(''); setGuardSearchOpen(false); }}
+                className="text-blue-400 hover:text-blue-700 ml-1"><X size={13} /></button>
+            </div>
+          ) : (
+            <div className="relative">
+              <button
+                onClick={() => setGuardSearchOpen(o => !o)}
+                className="flex items-center gap-2 border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                <Users size={14} /> Filter by guard <ChevronDown size={13} className="text-gray-400" />
+              </button>
+              {guardSearchOpen && (
+                <div className="absolute z-30 top-full mt-1 left-0 w-64 bg-white border border-gray-200 rounded-xl shadow-lg">
+                  <div className="p-2 border-b border-gray-100">
+                    <div className="relative">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input autoFocus placeholder="Search guard…" className="input pl-7 py-1.5 text-sm"
+                        value={guardSearchText} onChange={e => setGuardSearchText(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto py-1">
+                    {guards
+                      .filter(g => !guardSearchText || g.full_name?.toLowerCase().includes(guardSearchText.toLowerCase()))
+                      .map(g => (
+                        <button key={g.id} onClick={() => { setFilterGuardId(g.id); setGuardSearchOpen(false); setGuardSearchText(''); }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-gray-50">
+                          {g.full_name}
+                        </button>
+                      ))
+                    }
+                    {guards.filter(g => !guardSearchText || g.full_name?.toLowerCase().includes(guardSearchText.toLowerCase())).length === 0 && (
+                      <p className="px-4 py-2 text-xs text-gray-400">No guards found</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Sort control */}
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-xs text-gray-400 font-medium">Sort:</span>
+          <select className="input py-1.5 text-sm w-auto pr-8"
+            value={sortKey} onChange={e => setSortKey(e.target.value)}>
+            <option value="period_start">Period</option>
+            <option value="guard">Guard name</option>
+            <option value="hours">Hours</option>
+            <option value="gross">Gross pay</option>
+            <option value="net">Net pay</option>
+            <option value="status">Status</option>
+          </select>
+          <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+            className="border border-gray-200 bg-white rounded-lg p-1.5 hover:bg-gray-50 transition-colors" title={sortDir === 'asc' ? 'Ascending' : 'Descending'}>
+            {sortDir === 'asc' ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </button>
+        </div>
+      </div>
+
       {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
-        !entries.length ? <EmptyState icon={DollarSign} title="No payroll entries" /> : (
+        !displayedEntries.length ? (
+          entries.length && (filterGuardId || filterStatus)
+            ? <div className="text-center py-12 text-gray-400 text-sm">No entries match your filters. <button className="underline text-gray-500 hover:text-gray-800" onClick={() => { setFilterGuardId(''); setFilterStatus(''); }}>Clear filters</button></div>
+            : <EmptyState icon={DollarSign} title="No payroll entries" />
+        ) : (
           <div className="card p-0 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>{['Guard', 'Period', 'Hours', 'Rate', 'Gross', 'Deductions', 'Net Pay', 'Paid Via', 'Status', ''].map(h => <th key={h} className="table-head">{h}</th>)}</tr>
+                  <tr>
+                    {[
+                      { label: 'Guard',    key: 'guard' },
+                      { label: 'Period',   key: 'period_start' },
+                      { label: 'Hours',    key: 'hours' },
+                      { label: 'Rate',     key: 'rate' },
+                      { label: 'Gross',    key: 'gross' },
+                      { label: 'Deductions', key: null },
+                      { label: 'Net Pay',  key: 'net' },
+                      { label: 'Paid Via', key: null },
+                      { label: 'Status',   key: 'status' },
+                      { label: '',         key: null },
+                    ].map(({ label, key }) => (
+                      <th key={label} className="table-head">
+                        {key ? (
+                          <button onClick={() => toggleSort(key)}
+                            className="flex items-center gap-1 font-semibold text-gray-600 hover:text-gray-900 transition-colors">
+                            {label}
+                            {sortKey === key
+                              ? (sortDir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />)
+                              : <ChevronsUpDown size={13} className="text-gray-300" />}
+                          </button>
+                        ) : label}
+                      </th>
+                    ))}
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {entries.map(e => {
+                  {displayedEntries.map(e => {
                     const hrs = e.hours_regular ?? e.hours_worked ?? 0;
                     const rate = e.pay_rate ?? e.hourly_rate ?? 0;
                     const gross = e.gross ?? e.gross_pay ?? (hrs * rate);
