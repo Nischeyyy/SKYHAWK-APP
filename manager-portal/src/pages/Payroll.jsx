@@ -4,7 +4,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import Badge from '../components/Badge.jsx';
 import Modal from '../components/Modal.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import { DollarSign, Plus, Edit2, Calculator, Trash2 } from 'lucide-react';
+import { DollarSign, Plus, Edit2, Calculator, Trash2, Upload, FileSpreadsheet, CheckCircle2, XCircle, Search, Users } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 const PAID_VIA_OPTIONS = [
@@ -33,6 +33,21 @@ export default function Payroll() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+
+  // ── Timesheet import ──
+  const [importStage, setImportStage] = useState(null); // null | 'upload' | 'preview' | 'done'
+  const [importFile, setImportFile] = useState(null);
+  const [importFromDate, setImportFromDate] = useState('');
+  const [importToDate, setImportToDate] = useState('');
+  const [importDefaultRate, setImportDefaultRate] = useState('24.50');
+  const [importParsing, setImportParsing] = useState(false);
+  const [importPreview, setImportPreview] = useState(null);
+  const [importRows, setImportRows] = useState([]);
+  const [importSearch, setImportSearch] = useState('');
+  const [importCreating, setImportCreating] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importError, setImportError] = useState('');
+  const [importGlobalRate, setImportGlobalRate] = useState('');
 
   async function load() {
     const [pd, gd] = await Promise.all([api.payroll(filterStatus ? `?status=${filterStatus}` : ''), api.guards()]);
@@ -90,6 +105,56 @@ export default function Payroll() {
     setForm(p => ({ ...p, deductions: p.deductions.filter((_, idx) => idx !== i) }));
   }
 
+  // ── Import handlers ──
+  function openImport() {
+    setImportStage('upload'); setImportFile(null); setImportFromDate('');
+    setImportToDate(''); setImportDefaultRate('24.50'); setImportError('');
+    setImportPreview(null); setImportRows([]); setImportSearch(''); setImportResult(null);
+  }
+  function closeImport() { setImportStage(null); }
+
+  async function handleParseTimesheet(e) {
+    e.preventDefault();
+    if (!importFile) return;
+    setImportParsing(true); setImportError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', importFile);
+      const params = new URLSearchParams();
+      if (importFromDate) params.set('from_date', importFromDate);
+      if (importToDate)   params.set('to_date', importToDate);
+      const data = await api.parseTimesheet(fd, params.toString());
+      setImportPreview(data);
+      setImportRows(data.guards.map(g => ({ ...g, pay_rate: importDefaultRate, included: true })));
+      setImportStage('preview');
+    } catch (err) { setImportError(err.message); } finally { setImportParsing(false); }
+  }
+
+  function toggleAllImport(val) { setImportRows(r => r.map(x => ({ ...x, included: val }))); }
+  function toggleMatchedImport() { setImportRows(r => r.map(x => ({ ...x, included: x.matched }))); }
+  function applyGlobalRate(rate) { setImportRows(r => r.map(x => ({ ...x, pay_rate: rate }))); }
+  function updateImportRow(idx, field, val) {
+    setImportRows(r => r.map((x, i) => i === idx ? { ...x, [field]: val } : x));
+  }
+
+  async function handleBulkCreate() {
+    const selected = importRows.filter(r => r.included && r.period_start && r.period_end);
+    if (!selected.length) return;
+    setImportCreating(true); setImportError('');
+    try {
+      const entries = selected.map(r => ({
+        lic_number: r.lic_number, guard_name: r.guard_name,
+        user_id: r.user_id || null,
+        period_start: r.period_start, period_end: r.period_end,
+        hours_regular: r.total_hours,
+        pay_rate: Number(r.pay_rate) || 0,
+        notes: `Imported from timesheet · ${r.shift_count} shift${r.shift_count !== 1 ? 's' : ''} · ${r.projects?.slice(0,3).join(', ') || ''}`.trim().replace(/·\s*$/, ''),
+      }));
+      const res = await api.bulkCreatePayroll(entries);
+      setImportResult(res); setImportStage('done'); await load();
+    } catch (err) { setImportError(err.message); } finally { setImportCreating(false); }
+  }
+
   async function handleCalculate(e) {
     e.preventDefault(); setSaving(true); setError('');
     try {
@@ -110,6 +175,9 @@ export default function Payroll() {
       <PageHeader title="Payroll" subtitle={`${entries.length} entries · ${totalGross.toFixed(2)} gross`}
         action={
           <div className="flex gap-2">
+            <button className="btn-secondary flex items-center gap-2" onClick={openImport}>
+              <Upload size={16} /> Import Timesheet
+            </button>
             <button className="btn-secondary flex items-center gap-2" onClick={() => { setCalcForm({ period_start: '', period_end: '', hourly_rate: '' }); setError(''); setCalcModal(true); }}>
               <Calculator size={16} /> Calculate
             </button>
@@ -290,6 +358,233 @@ export default function Payroll() {
               <button type="submit" className="btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save Entry'}</button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* ── Import Timesheet Modal ── */}
+      {importStage === 'upload' && (
+        <Modal title="Import Client Timesheet" onClose={closeImport}>
+          <form onSubmit={handleParseTimesheet} className="space-y-5">
+            {importError && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{importError}</p>}
+
+            {/* File drop zone */}
+            <div>
+              <label className="label">Timesheet File (.xlsx)</label>
+              <label className={`flex flex-col items-center justify-center gap-3 border-2 border-dashed rounded-xl p-8 cursor-pointer transition-colors ${importFile ? 'border-green-400 bg-green-50' : 'border-gray-200 hover:border-gray-400 bg-gray-50'}`}>
+                <input type="file" accept=".xlsx,.xls" className="hidden" required
+                  onChange={e => setImportFile(e.target.files[0] || null)} />
+                {importFile ? (
+                  <>
+                    <FileSpreadsheet size={32} className="text-green-600" />
+                    <div className="text-center">
+                      <p className="font-semibold text-gray-900 text-sm">{importFile.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{(importFile.size / 1024).toFixed(0)} KB — click to change</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={32} className="text-gray-400" />
+                    <div className="text-center">
+                      <p className="font-semibold text-gray-700 text-sm">Click to select file</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Supports .xlsx and .xls</p>
+                    </div>
+                  </>
+                )}
+              </label>
+            </div>
+
+            {/* Optional date range filter */}
+            <div>
+              <label className="label">Filter by Pay Period <span className="font-normal text-gray-400">(optional — leave blank to import all dates)</span></label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">From date</label>
+                  <input type="date" className="input" value={importFromDate} onChange={e => setImportFromDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">To date</label>
+                  <input type="date" className="input" value={importToDate} onChange={e => setImportToDate(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            {/* Default pay rate */}
+            <div>
+              <label className="label">Default Pay Rate ($ / hr)</label>
+              <div className="relative w-48">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                <input type="number" step="0.01" min="0" className="input pl-6" value={importDefaultRate}
+                  onChange={e => setImportDefaultRate(e.target.value)} required />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">You can override per-guard in the next step.</p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <button type="button" className="btn-secondary" onClick={closeImport}>Cancel</button>
+              <button type="submit" className="btn-primary flex items-center gap-2" disabled={importParsing || !importFile}>
+                {importParsing ? 'Parsing…' : <><Search size={15} /> Parse & Preview</>}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {importStage === 'preview' && importPreview && (() => {
+        const filtered = importRows.filter(r =>
+          !importSearch || r.guard_name.toLowerCase().includes(importSearch.toLowerCase()) || r.lic_number.includes(importSearch)
+        );
+        const selectedCount = importRows.filter(r => r.included).length;
+        const selectedHours = importRows.filter(r => r.included).reduce((s, r) => s + r.total_hours, 0);
+        const selectedGross = importRows.filter(r => r.included).reduce((s, r) => s + (r.total_hours * (Number(r.pay_rate) || 0)), 0);
+        return (
+          <Modal title="Import Preview" onClose={closeImport} size="xl">
+            {importError && <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">{importError}</p>}
+
+            {/* Summary bar */}
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              {[
+                { label: 'Guards found',    value: importPreview.total_guards },
+                { label: 'Total shifts',    value: importPreview.total_shifts },
+                { label: 'Total hours',     value: `${importPreview.total_hours.toFixed(1)}h` },
+                { label: 'Matched to DB',   value: `${importPreview.matched_guards} / ${importPreview.total_guards}` },
+              ].map(s => (
+                <div key={s.label} className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-center">
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mb-0.5">{s.label}</p>
+                  <p className="text-gray-900 font-bold text-lg">{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Controls row */}
+            <div className="flex flex-wrap gap-2 items-center mb-3">
+              <div className="relative flex-1 min-w-48">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input placeholder="Search by name or licence #…" className="input pl-8 py-1.5 text-sm"
+                  value={importSearch} onChange={e => setImportSearch(e.target.value)} />
+              </div>
+              <button onClick={() => toggleAllImport(true)} className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-colors">Select all</button>
+              <button onClick={() => toggleAllImport(false)} className="text-xs px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-colors">Deselect all</button>
+              <button onClick={toggleMatchedImport} className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium transition-colors">Matched only</button>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <span className="text-xs text-gray-500">Set all rates:</span>
+                <div className="relative w-28">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                  <input type="number" step="0.01" min="0" placeholder="rate" className="input pl-5 py-1.5 text-sm w-full"
+                    value={importGlobalRate} onChange={e => setImportGlobalRate(e.target.value)}
+                    onBlur={() => { if (importGlobalRate) applyGlobalRate(importGlobalRate); }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Preview table */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden mb-4">
+              <div className="max-h-80 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                    <tr>
+                      <th className="table-head w-8 text-center">✓</th>
+                      <th className="table-head">Guard Name</th>
+                      <th className="table-head">Lic #</th>
+                      <th className="table-head text-center">Status</th>
+                      <th className="table-head text-right">Shifts</th>
+                      <th className="table-head text-right">Hours</th>
+                      <th className="table-head">Period</th>
+                      <th className="table-head text-right">Rate ($/hr)</th>
+                      <th className="table-head text-right">Est. Gross</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filtered.map((row, fi) => {
+                      const realIdx = importRows.findIndex(r => r.lic_number === row.lic_number);
+                      const gross = row.total_hours * (Number(row.pay_rate) || 0);
+                      return (
+                        <tr key={row.lic_number} className={`transition-colors ${row.included ? 'hover:bg-gray-50' : 'opacity-40 bg-gray-50'}`}>
+                          <td className="table-cell text-center">
+                            <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
+                              checked={row.included} onChange={e => updateImportRow(realIdx, 'included', e.target.checked)} />
+                          </td>
+                          <td className="table-cell font-medium text-gray-900">{row.guard_name}</td>
+                          <td className="table-cell font-mono text-gray-500 text-xs">{row.lic_number}</td>
+                          <td className="table-cell text-center">
+                            {row.matched ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                                <CheckCircle2 size={11} /> Matched
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                                <Users size={11} /> New
+                              </span>
+                            )}
+                          </td>
+                          <td className="table-cell text-right text-gray-600">{row.shift_count}</td>
+                          <td className="table-cell text-right font-mono">{row.total_hours.toFixed(1)}h</td>
+                          <td className="table-cell text-xs text-gray-500">
+                            {row.period_start ? row.period_start.slice(5) : '—'} → {row.period_end ? row.period_end.slice(5) : '—'}
+                          </td>
+                          <td className="table-cell text-right">
+                            <div className="relative w-24 ml-auto">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                              <input type="number" step="0.01" min="0"
+                                className="input pl-4 py-1 text-xs text-right w-full font-mono"
+                                value={row.pay_rate}
+                                onChange={e => updateImportRow(realIdx, 'pay_rate', e.target.value)} />
+                            </div>
+                          </td>
+                          <td className="table-cell text-right font-semibold text-gray-900">${gross.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                    {filtered.length === 0 && (
+                      <tr><td colSpan={9} className="text-center py-8 text-gray-400 text-sm">No guards match your search.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer summary + action */}
+            <div className="bg-gray-900 rounded-xl px-5 py-4 flex items-center justify-between gap-4">
+              <div className="flex gap-6">
+                <div>
+                  <p className="text-gray-400 text-xs uppercase tracking-wider">Selected</p>
+                  <p className="text-white font-bold">{selectedCount} guard{selectedCount !== 1 ? 's' : ''}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs uppercase tracking-wider">Total Hours</p>
+                  <p className="text-white font-bold">{selectedHours.toFixed(1)}h</p>
+                </div>
+                <div>
+                  <p className="text-gray-400 text-xs uppercase tracking-wider">Total Gross</p>
+                  <p className="text-white font-bold">${selectedGross.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button className="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:text-white text-sm font-medium transition-colors"
+                  onClick={() => setImportStage('upload')}>← Back</button>
+                <button
+                  onClick={handleBulkCreate}
+                  disabled={importCreating || selectedCount === 0}
+                  className="px-5 py-2 rounded-lg bg-white text-gray-900 text-sm font-bold hover:bg-gray-100 transition-colors disabled:opacity-50">
+                  {importCreating ? 'Creating…' : `Create ${selectedCount} Payroll Record${selectedCount !== 1 ? 's' : ''}`}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {importStage === 'done' && (
+        <Modal title="Import Complete" onClose={closeImport}>
+          <div className="text-center py-6 space-y-4">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+              <CheckCircle2 size={36} className="text-green-600" />
+            </div>
+            <div>
+              <p className="text-gray-900 font-bold text-xl">{importResult?.created ?? 0} payroll records created</p>
+              <p className="text-gray-500 text-sm mt-1">All entries are in <strong>Submitted</strong> status — review and approve as needed.</p>
+            </div>
+            <button className="btn-primary mt-4" onClick={closeImport}>Done</button>
+          </div>
         </Modal>
       )}
 

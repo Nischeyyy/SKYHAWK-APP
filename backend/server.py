@@ -1,6 +1,8 @@
 """Skyhawk Security Operations - Backend API
 JWT-based authentication, shift management, time clock, wallet, incidents, payroll, announcements.
 """
+import io
+import re
 import os
 import uuid
 import json
@@ -2074,6 +2076,185 @@ async def admin_create_payroll(body: AdminCreatePayrollIn, admin=Depends(require
     }
     await db.payroll.insert_one(record); record.pop("_id", None)
     return record
+
+
+# ── Timesheet Import ────────────────────────────────────────────────────────
+
+def _parse_timesheet_xlsx(data: bytes, from_date=None, to_date=None):
+    """Parse a client timesheet xlsx and return per-guard shift summaries."""
+    try:
+        import openpyxl
+    except ImportError:
+        raise HTTPException(500, "openpyxl not available on server. Contact admin.")
+
+    wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True)
+    ws = wb["Sheet1"] if "Sheet1" in wb.sheetnames else wb.active
+
+    guards: dict = {}
+    for r in range(2, ws.max_row + 1):
+        row = [ws.cell(r, c).value for c in range(1, 10)]
+        if not any(row):
+            continue
+        name_raw, lic_raw, date_val, project = row[0], row[1], row[2], row[3]
+        hours = float(row[7]) if row[7] is not None else 0.0
+
+        if not name_raw:
+            continue
+        name_str = str(name_raw).strip()
+        if name_str.lower().startswith("skyhawk"):
+            continue
+
+        # Parse shift date
+        shift_date = None
+        if isinstance(date_val, datetime):
+            shift_date = date_val.date()
+        elif isinstance(date_val, date):
+            shift_date = date_val
+
+        # Optional date-range filter
+        if shift_date and from_date and shift_date < from_date:
+            continue
+        if shift_date and to_date and shift_date > to_date:
+            continue
+
+        # Parse licence number (stored as float in some cells)
+        if lic_raw is not None:
+            try:
+                lic_str = str(int(float(lic_raw)))
+            except Exception:
+                lic_str = str(lic_raw).strip()
+        else:
+            m = re.search(r"(\d{7,10})$", name_str)
+            lic_str = m.group(1) if m else None
+        if not lic_str:
+            continue
+
+        # Clean name – strip {N} repeat-markers and embedded lic number at tail
+        clean = re.sub(r"\s*\{[^}]*\}", "", name_str).strip()
+        clean = re.sub(r"\s+\d{6,10}$", "", clean).strip()
+
+        if lic_str not in guards:
+            guards[lic_str] = {
+                "lic_number": lic_str, "guard_name": clean,
+                "total_hours": 0.0, "shift_count": 0,
+                "dates": [], "projects": [],
+            }
+        g = guards[lic_str]
+        g["total_hours"] += hours
+        g["shift_count"] += 1
+        if shift_date:
+            g["dates"].append(shift_date.isoformat())
+        proj = str(project).strip() if project else None
+        if proj and proj not in g["projects"]:
+            g["projects"].append(proj)
+
+    result = []
+    for g in guards.values():
+        ds = sorted(g["dates"])
+        result.append({
+            "lic_number":   g["lic_number"],
+            "guard_name":   g["guard_name"],
+            "total_hours":  round(g["total_hours"], 2),
+            "shift_count":  g["shift_count"],
+            "period_start": ds[0]  if ds else None,
+            "period_end":   ds[-1] if ds else None,
+            "projects":     g["projects"][:5],
+        })
+    result.sort(key=lambda x: x["guard_name"].upper())
+    return result
+
+
+@api.post("/admin/payroll/parse-timesheet")
+async def parse_timesheet_upload(
+    file: UploadFile = File(...),
+    from_date: Optional[str] = Query(None),
+    to_date: Optional[str] = Query(None),
+    admin=Depends(require_admin),
+):
+    data = await file.read()
+    from_d = date.fromisoformat(from_date) if from_date else None
+    to_d   = date.fromisoformat(to_date)   if to_date   else None
+    try:
+        guards = _parse_timesheet_xlsx(data, from_d, to_d)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(400, f"Could not parse file: {exc}")
+
+    if not guards:
+        raise HTTPException(400, "No valid shift rows found. Check the date range or file format.")
+
+    # Match guards in DB by licence_number field
+    lic_numbers = [g["lic_number"] for g in guards]
+    db_users = await db.users.find(
+        {"licence_number": {"$in": lic_numbers}},
+        {"_id": 0, "id": 1, "full_name": 1, "licence_number": 1},
+    ).to_list(5000)
+    lic_to_user = {u["licence_number"]: u for u in db_users}
+
+    matched = 0
+    for g in guards:
+        u = lic_to_user.get(g["lic_number"])
+        g["user_id"]      = u["id"]        if u else None
+        g["matched_name"] = u["full_name"] if u else None
+        g["matched"]      = bool(u)
+        if u:
+            matched += 1
+
+    return {
+        "guards":         guards,
+        "total_guards":   len(guards),
+        "total_shifts":   sum(g["shift_count"] for g in guards),
+        "total_hours":    round(sum(g["total_hours"] for g in guards), 2),
+        "matched_guards": matched,
+    }
+
+
+class BulkPayrollEntryIn(BaseModel):
+    lic_number:   str
+    guard_name:   str
+    user_id:      Optional[str] = None
+    period_start: str
+    period_end:   str
+    pay_date:     Optional[str] = None
+    hours_regular: float
+    pay_rate:     float
+    notes:        Optional[str] = ""
+
+
+@api.post("/admin/payroll/bulk-create", status_code=201)
+async def bulk_create_payroll(entries: List[BulkPayrollEntryIn], admin=Depends(require_admin)):
+    records = []
+    for e in entries:
+        gross = round(e.hours_regular * e.pay_rate, 2)
+        records.append({
+            "id":               str(uuid.uuid4()),
+            "user_id":          e.user_id or f"ext:{e.lic_number}",
+            "lic_number":       e.lic_number,
+            "guard_name_import": e.guard_name,
+            "period_start":     e.period_start,
+            "period_end":       e.period_end,
+            "pay_date":         e.pay_date or e.period_end,
+            "hours_regular":    e.hours_regular,
+            "hours_overtime":   0.0,
+            "pay_rate":         e.pay_rate,
+            "gross":            gross,
+            "deductions":       [],
+            "total_deductions": 0.0,
+            "net":              gross,
+            "status":           "submitted",
+            "notes":            e.notes or "",
+            "paid_via":         None,
+            "pay_stub_url":     None,
+            "imported":         True,
+            "created_by":       admin["id"],
+            "created_at":       iso(now_utc()),
+        })
+    if records:
+        await db.payroll.insert_many(records)
+        for r in records:
+            r.pop("_id", None)
+    return {"created": len(records)}
 
 
 @api.put("/admin/payroll/{payroll_id}")

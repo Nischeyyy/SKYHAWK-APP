@@ -88,6 +88,8 @@ export const api = {
   createPayroll: (body) => request('POST', '/admin/payroll', body),
   updatePayroll: (id, body) => request('PUT', `/admin/payroll/${id}`, body),
   calculatePayroll: (body) => request('POST', '/admin/payroll/calculate', body),
+  parseTimesheet: (formData, params = '') => request('POST', `/admin/payroll/parse-timesheet${params ? `?${params}` : ''}`, null, formData),
+  bulkCreatePayroll: (entries) => request('POST', '/admin/payroll/bulk-create', entries),
 
   // Announcements
   announcements: () => request('GET', '/admin/announcements'),
