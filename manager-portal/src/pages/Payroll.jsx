@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { api } from '../api/client.js';
 import PageHeader from '../components/PageHeader.jsx';
 import Badge from '../components/Badge.jsx';
 import Modal from '../components/Modal.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import { DollarSign, Plus, Edit2, Calculator, Trash2, Upload, FileSpreadsheet, CheckCircle2, XCircle, Search, Users, FileDown, ChevronUp, ChevronDown, ChevronsUpDown, Filter, X } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import PayrollDashboard from '../components/PayrollDashboard.jsx';
+import PayrollFeaturePanel, { loadFeatures, saveFeatures } from '../components/PayrollFeaturePanel.jsx';
+import { DollarSign, Plus, Edit2, Calculator, Trash2, Upload, FileSpreadsheet, CheckCircle2, XCircle, Search, Users, FileDown, ChevronUp, ChevronDown, ChevronsUpDown, X, Settings2, AlertTriangle, Calendar, RefreshCw, MessageSquare, FileText, Download } from 'lucide-react';
+import { format, parseISO, addDays, addWeeks } from 'date-fns';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -47,6 +49,56 @@ export default function Payroll() {
   const [sortDir, setSortDir] = useState('desc');
   const [searchText, setSearchText] = useState('');
 
+  // ── Feature flags ──
+  const [features, setFeatures] = useState(() => loadFeatures());
+  const [featurePanelOpen, setFeaturePanelOpen] = useState(false);
+  function toggleFeature(id) {
+    setFeatures(prev => { const next = { ...prev, [id]: !prev[id] }; saveFeatures(next); return next; });
+  }
+
+  // ── Bulk selection ──
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
+  function toggleSelect(id) { setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
+  function toggleSelectAll() {
+    setSelectedIds(prev => prev.size === displayedEntries.length ? new Set() : new Set(displayedEntries.map(e => e.id)));
+  }
+  async function bulkSetStatus(status) {
+    if (!selectedIds.size) return;
+    setBulkSaving(true);
+    try {
+      await api.bulkUpdatePayroll([...selectedIds], { status });
+      await load();
+      setSelectedIds(new Set());
+    } finally { setBulkSaving(false); }
+  }
+  function bulkExportExcel() {
+    const rows = displayedEntries.filter(e => selectedIds.has(e.id));
+    const ws = XLSX.utils.json_to_sheet(rows.map(e => ({
+      Guard: guardMap[e.user_id]?.full_name || '',
+      Period: `${e.period_start} – ${e.period_end}`,
+      Hours: e.hours_regular ?? e.hours_worked ?? 0,
+      Rate: e.pay_rate ?? e.hourly_rate ?? 0,
+      Gross: e.gross ?? 0, Net: e.net ?? 0, Status: e.status,
+    })));
+    XLSX.utils.book_append_sheet(XLSX.utils.book_new(), ws, 'Payroll');
+    XLSX.writeFile(XLSX.utils.book_new(), 'payroll-selection.xlsx');
+  }
+
+  // ── Comments (audit trail) ──
+  const [newComment, setNewComment] = useState('');
+
+  // ── Recurring schedules ──
+  const [recurringModal, setRecurringModal] = useState(false);
+  const [schedules, setSchedules] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('payroll_schedules') || '{}'); } catch { return {}; }
+  });
+  function saveSchedule(guardId, cadence) {
+    const next = { ...schedules, [guardId]: cadence };
+    setSchedules(next);
+    localStorage.setItem('payroll_schedules', JSON.stringify(next));
+  }
+
   // ── Timesheet import ──
   const [importStage, setImportStage] = useState(null); // null | 'upload' | 'preview' | 'done'
   const [importFile, setImportFile] = useState(null);
@@ -84,8 +136,9 @@ export default function Payroll() {
       notes: e.notes || '',
       deductions: e.deductions || [],
       paid_via: e.paid_via || '',
+      comments: e.comments || [],
     });
-    setEditing(e); setError(''); setModal('entry');
+    setEditing(e); setError(''); setNewComment(''); setModal('entry');
   }
 
   async function handleSave(e) {
@@ -202,6 +255,44 @@ export default function Payroll() {
   const guardMap = Object.fromEntries(guards.map(g => [g.id, g]));
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
   const fc = (k) => (e) => setCalcForm(p => ({ ...p, [k]: e.target.value }));
+
+  // ── Anomaly detection ──
+  const anomalyIds = useMemo(() => {
+    const guardGross = {};
+    entries.forEach(e => {
+      const gross = e.gross ?? e.gross_pay ?? ((e.hours_regular ?? 0) * (e.pay_rate ?? 0));
+      if (!guardGross[e.user_id]) guardGross[e.user_id] = [];
+      guardGross[e.user_id].push(gross);
+    });
+    const bad = new Set();
+    entries.forEach(e => {
+      const hrs  = e.hours_regular ?? e.hours_worked ?? 0;
+      const rate = e.pay_rate ?? e.hourly_rate ?? 0;
+      const gross = e.gross ?? e.gross_pay ?? (hrs * rate);
+      const list = guardGross[e.user_id] || [];
+      const avg  = list.reduce((a, b) => a + b, 0) / (list.length || 1);
+      if (hrs === 0 || rate === 0 || (list.length > 1 && Math.abs(gross - avg) > avg * 0.6)) bad.add(e.id);
+    });
+    return bad;
+  }, [entries]);
+
+  // ── Overlap detection ──
+  const overlapIds = useMemo(() => {
+    const byGuard = {};
+    entries.forEach(e => { (byGuard[e.user_id] = byGuard[e.user_id] || []).push(e); });
+    const bad = new Set();
+    Object.values(byGuard).forEach(list => {
+      for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        if (a.period_start && a.period_end && b.period_start && b.period_end) {
+          if (new Date(a.period_start) <= new Date(b.period_end) && new Date(b.period_start) <= new Date(a.period_end)) {
+            bad.add(a.id); bad.add(b.id);
+          }
+        }
+      }
+    });
+    return bad;
+  }, [entries]);
 
   // ── Sort toggle ──
   function toggleSort(key) {
@@ -329,6 +420,12 @@ export default function Payroll() {
               <Calculator size={16} /> Calculate
             </button>
             <button className="btn-primary flex items-center gap-2" onClick={openCreate}><Plus size={16} /> Add Entry</button>
+            <button
+              onClick={() => setFeaturePanelOpen(true)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm font-medium transition-all ${Object.values(features).some(Boolean) ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'}`}>
+              <Settings2 size={15} />
+              Features {Object.values(features).filter(Boolean).length > 0 && <span className="bg-white text-gray-900 rounded-full px-1.5 py-0.5 text-xs font-bold leading-none">{Object.values(features).filter(Boolean).length}</span>}
+            </button>
           </div>
         }
       />
@@ -427,6 +524,12 @@ export default function Payroll() {
 
         {/* Sort control */}
         <div className="flex items-center gap-2 ml-auto">
+          {features.recurring && (
+            <button onClick={() => setRecurringModal(true)}
+              className="flex items-center gap-1.5 text-sm border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl px-3 py-1.5 transition-colors font-medium">
+              <RefreshCw size={13} /> Schedules
+            </button>
+          )}
           <span className="text-xs text-gray-400 font-medium">Sort:</span>
           <select className="input py-1.5 text-sm w-auto pr-8"
             value={sortKey} onChange={e => setSortKey(e.target.value)}>
@@ -444,6 +547,11 @@ export default function Payroll() {
         </div>
       </div>
 
+      {/* ── Dashboard (feature) ── */}
+      {features.dashboard && !loading && entries.length > 0 && (
+        <PayrollDashboard entries={entries} guardMap={guardMap} anomalyCount={anomalyIds.size} />
+      )}
+
       {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !displayedEntries.length ? (
           entries.length && (filterGuardIds.length > 0 || filterStatus || searchText)
@@ -455,17 +563,25 @@ export default function Payroll() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
+                    {/* Bulk checkbox */}
+                    {features.bulk && (
+                      <th className="table-head w-10">
+                        <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
+                          checked={selectedIds.size === displayedEntries.length && displayedEntries.length > 0}
+                          onChange={toggleSelectAll} />
+                      </th>
+                    )}
                     {[
-                      { label: 'Guard',    key: 'guard' },
-                      { label: 'Period',   key: 'period_start' },
-                      { label: 'Hours',    key: 'hours' },
-                      { label: 'Rate',     key: 'rate' },
-                      { label: 'Gross',    key: 'gross' },
+                      { label: 'Guard',      key: 'guard' },
+                      { label: 'Period',     key: 'period_start' },
+                      { label: 'Hours',      key: 'hours' },
+                      { label: 'Rate',       key: 'rate' },
+                      { label: 'Gross',      key: 'gross' },
                       { label: 'Deductions', key: null },
-                      { label: 'Net Pay',  key: 'net' },
-                      { label: 'Paid Via', key: null },
-                      { label: 'Status',   key: 'status' },
-                      { label: '',         key: null },
+                      { label: 'Net Pay',    key: 'net' },
+                      { label: 'Paid Via',   key: null },
+                      { label: 'Status',     key: 'status' },
+                      { label: '',           key: null },
                     ].map(({ label, key }) => (
                       <th key={label} className="table-head">
                         {key ? (
@@ -489,10 +605,27 @@ export default function Payroll() {
                     const totalDed = e.total_deductions ?? (e.deductions || []).reduce((s, d) => s + (d.amount || 0), 0);
                     const net = e.net ?? (gross - totalDed);
                     const paidViaLabel = PAID_VIA_OPTIONS.find(o => o.value === e.paid_via)?.label || '—';
+                    const isAnomaly  = features.anomaly  && anomalyIds.has(e.id);
+                    const isOverlap  = features.overlap  && overlapIds.has(e.id);
+                    const isSelected = features.bulk     && selectedIds.has(e.id);
                     return (
-                      <tr key={e.id} className="hover:bg-gray-50/50 transition-colors">
+                      <tr key={e.id}
+                        className={`transition-colors ${isSelected ? 'bg-gray-900/5' : isAnomaly ? 'bg-amber-50 hover:bg-amber-100/60' : isOverlap ? 'bg-red-50 hover:bg-red-100/60' : 'hover:bg-gray-50/50'}`}>
+
+                        {/* Bulk checkbox */}
+                        {features.bulk && (
+                          <td className="table-cell">
+                            <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
+                              checked={isSelected} onChange={() => toggleSelect(e.id)} />
+                          </td>
+                        )}
+
                         <td className="table-cell">
-                          <p className="text-gray-900 text-sm font-medium">{guardMap[e.user_id]?.full_name || '—'}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-gray-900 text-sm font-medium">{guardMap[e.user_id]?.full_name || '—'}</p>
+                            {isAnomaly  && <span title="Anomaly detected"><AlertTriangle size={13} className="text-amber-500 flex-shrink-0" /></span>}
+                            {isOverlap  && <span title="Period overlaps another entry"><Calendar size={13} className="text-red-500 flex-shrink-0" /></span>}
+                          </div>
                         </td>
                         <td className="table-cell text-xs text-gray-600">
                           {e.period_start ? format(parseISO(e.period_start), 'MMM d') : '—'} – {e.period_end ? format(parseISO(e.period_end), 'MMM d') : '—'}
@@ -505,7 +638,16 @@ export default function Payroll() {
                         <td className="table-cell text-xs text-gray-500">{paidViaLabel}</td>
                         <td className="table-cell"><Badge status={e.status} /></td>
                         <td className="table-cell text-right">
-                          <button onClick={() => openEdit(e)} className="text-gray-400 hover:text-gray-900 p-1.5 rounded transition-colors"><Edit2 size={16} /></button>
+                          <div className="flex items-center gap-0.5 justify-end">
+                            {features.paystub && (
+                              <a href={`/api/payroll/${e.id}/stub`} target="_blank" rel="noreferrer"
+                                title="Download pay stub"
+                                className="text-gray-400 hover:text-blue-600 p-1.5 rounded transition-colors">
+                                <FileText size={15} />
+                              </a>
+                            )}
+                            <button onClick={() => openEdit(e)} className="text-gray-400 hover:text-gray-900 p-1.5 rounded transition-colors"><Edit2 size={16} /></button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -515,6 +657,34 @@ export default function Payroll() {
             </div>
           </div>
         )
+      )}
+
+      {/* ── Bulk action bar ── */}
+      {features.bulk && selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/10">
+          <span className="text-sm font-semibold">{selectedIds.size} selected</span>
+          <div className="w-px h-5 bg-white/20" />
+          <button disabled={bulkSaving} onClick={() => bulkSetStatus('approved')}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50">
+            <CheckCircle2 size={14} /> Approve
+          </button>
+          <button disabled={bulkSaving} onClick={() => bulkSetStatus('paid')}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50">
+            <DollarSign size={14} /> Mark Paid
+          </button>
+          <button disabled={bulkSaving} onClick={() => bulkSetStatus('under_review')}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50">
+            Under Review
+          </button>
+          <button onClick={exportExcel}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
+            <Download size={14} /> Export
+          </button>
+          <button onClick={() => setSelectedIds(new Set())}
+            className="ml-1 text-white/50 hover:text-white transition-colors">
+            <X size={16} />
+          </button>
+        </div>
       )}
 
       {modal === 'entry' && (
@@ -600,6 +770,50 @@ export default function Payroll() {
 
             {/* Notes */}
             <div><label className="label">Notes</label><textarea className="input resize-none" rows={2} value={form.notes} onChange={f('notes')} /></div>
+
+            {/* Audit trail comments (feature) */}
+            {features.comments && (
+              <div>
+                <label className="label flex items-center gap-1.5"><MessageSquare size={13} className="text-teal-600" /> Approval Comments</label>
+                {/* Existing comments */}
+                {(form.comments || []).length > 0 && (
+                  <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                    {(form.comments || []).map((c, i) => (
+                      <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                        <div className="flex items-center justify-between text-xs text-gray-400 mb-0.5">
+                          <span className="font-semibold text-gray-600">{c.author || 'Manager'}</span>
+                          <span>{c.at ? format(parseISO(c.at), 'MMM d, h:mm a') : ''}</span>
+                        </div>
+                        <p className="text-sm text-gray-800">{c.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="text" placeholder="Add a comment (e.g. Approved — pending bank confirmation)…"
+                    className="input text-sm flex-1" value={newComment}
+                    onChange={e => setNewComment(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && newComment.trim()) {
+                        e.preventDefault();
+                        const comment = { text: newComment.trim(), at: new Date().toISOString(), author: 'Manager' };
+                        setForm(p => ({ ...p, comments: [...(p.comments || []), comment] }));
+                        setNewComment('');
+                      }
+                    }}
+                  />
+                  <button type="button"
+                    onClick={() => {
+                      if (!newComment.trim()) return;
+                      const comment = { text: newComment.trim(), at: new Date().toISOString(), author: 'Manager' };
+                      setForm(p => ({ ...p, comments: [...(p.comments || []), comment] }));
+                      setNewComment('');
+                    }}
+                    className="btn-primary px-3 text-sm">Add</button>
+                </div>
+              </div>
+            )}
 
             {/* Pay summary */}
             {form.hours_regular && form.pay_rate && (
@@ -976,6 +1190,49 @@ export default function Payroll() {
           </Modal>
         );
       })()}
+
+      {/* ── Recurring Schedules Modal (feature) ── */}
+      {features.recurring && recurringModal && (
+        <Modal title="Recurring Pay Schedules" onClose={() => setRecurringModal(false)} size="lg">
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">Set a pay cadence per guard. Stored locally as a reference when creating entries.</p>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {guards.map(g => (
+                <div key={g.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{g.full_name}</p>
+                    <p className="text-xs text-gray-400 truncate">{g.email}</p>
+                  </div>
+                  <select className="input py-1.5 text-sm w-44 flex-shrink-0"
+                    value={schedules[g.id] || ''}
+                    onChange={ev => saveSchedule(g.id, ev.target.value)}>
+                    <option value="">— No schedule —</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Biweekly</option>
+                    <option value="semimonthly">Semi-monthly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                  {schedules[g.id] && (
+                    <span className="text-xs bg-indigo-100 text-indigo-700 font-semibold px-2.5 py-1 rounded-full capitalize flex-shrink-0">{schedules[g.id]}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end pt-2 border-t border-gray-100">
+              <button className="btn-primary" onClick={() => setRecurringModal(false)}>Done</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Feature Panel ── */}
+      {featurePanelOpen && (
+        <PayrollFeaturePanel
+          features={features}
+          onToggle={toggleFeature}
+          onClose={() => setFeaturePanelOpen(false)}
+        />
+      )}
     </div>
   );
 }

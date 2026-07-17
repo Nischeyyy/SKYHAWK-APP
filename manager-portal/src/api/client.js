@@ -87,9 +87,11 @@ export const api = {
   payroll: (params = '') => request('GET', `/admin/payroll${params}`),
   createPayroll: (body) => request('POST', '/admin/payroll', body),
   updatePayroll: (id, body) => request('PUT', `/admin/payroll/${id}`, body),
+  bulkUpdatePayroll: (ids, patch) => Promise.all(ids.map(id => request('PUT', `/admin/payroll/${id}`, patch))),
   calculatePayroll: (body) => request('POST', '/admin/payroll/calculate', body),
   parseTimesheet: (formData, params = '') => request('POST', `/admin/payroll/parse-timesheet${params ? `?${params}` : ''}`, null, formData),
   bulkCreatePayroll: (entries) => request('POST', '/admin/payroll/bulk-create', entries),
+  payrollStub: (id) => request('GET', `/payroll/${id}/stub`),
 
   // Announcements
   announcements: () => request('GET', '/admin/announcements'),
