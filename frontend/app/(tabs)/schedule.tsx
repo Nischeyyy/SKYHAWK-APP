@@ -90,6 +90,13 @@ export default function Schedule() {
   }, [view, weekAnchor, weekEnd, calGrid]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Background refresh every 30 s — manager shift changes appear automatically.
+  useEffect(() => {
+    const t = setInterval(() => { load(); }, 30_000);
+    return () => clearInterval(t);
+  }, [load]);
+
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   const jumpToToday = () => {

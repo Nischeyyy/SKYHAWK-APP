@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api/client.js';
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js';
 import PageHeader from '../components/PageHeader.jsx';
 import Modal from '../components/Modal.jsx';
 import Badge from '../components/Badge.jsx';
@@ -29,6 +30,7 @@ export default function Shifts() {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+  useAutoRefresh(load, 30_000); // catch guard-claimed open shifts
 
   function openCreate() { setForm(EMPTY); setEditing(null); setError(''); setModal(true); }
   function openEdit(s) {

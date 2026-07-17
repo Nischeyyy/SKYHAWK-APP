@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api/client.js';
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js';
 import PageHeader from '../components/PageHeader.jsx';
 import Badge from '../components/Badge.jsx';
 import Modal from '../components/Modal.jsx';
@@ -25,6 +26,7 @@ export default function Timeclock() {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+  useAutoRefresh(load, 20_000); // timeclock changes as guards clock in/out
 
   function openEdit(entry) {
     setForm({

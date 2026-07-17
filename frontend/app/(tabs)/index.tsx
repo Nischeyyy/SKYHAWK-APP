@@ -69,6 +69,13 @@ export default function Dashboard() {
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  // Background refresh every 30 s so changes made by the manager appear
+  // without requiring the guard to pull-to-refresh or navigate away.
+  useEffect(() => {
+    const t = setInterval(() => { load(); }, 30_000);
+    return () => clearInterval(t);
+  }, [load]);
+
   useEffect(() => {
     if (!loading) Animated.timing(fade, { toValue: 1, duration: 350, useNativeDriver: true }).start();
   }, [loading, fade]);

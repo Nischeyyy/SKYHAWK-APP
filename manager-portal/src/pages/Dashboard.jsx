@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js';
 import StatCard from '../components/StatCard.jsx';
 import PageHeader from '../components/PageHeader.jsx';
 import Badge from '../components/Badge.jsx';
@@ -12,9 +13,19 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    api.dashboard().then(setData).catch(console.error).finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    try {
+      const d = await api.dashboard();
+      setData(d);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useAutoRefresh(load, 30_000);
 
   if (loading) return <div className="text-gray-500 text-sm">Loading dashboard…</div>;
   if (!data) return null;
@@ -28,11 +39,11 @@ export default function Dashboard() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <StatCard label="Total Guards" value={data.total_guards} delta="12%" deltaType="positive" onClick={() => navigate('/manager/guards')} />
+        <StatCard label="Total Guards" value={data.total_guards} onClick={() => navigate('/manager/guards')} />
         <StatCard label="Shifts Today" value={data.shifts_today} onClick={() => navigate('/manager/shifts')} />
-        <StatCard label="Clocked In" value={data.active_clocked} delta="5%" deltaType="negative" onClick={() => navigate('/manager/timeclock')} />
+        <StatCard label="Clocked In" value={data.active_clocked} onClick={() => navigate('/manager/timeclock')} />
         <StatCard label="Open Incidents" value={data.open_incidents} onClick={() => navigate('/manager/incidents')} />
-        <StatCard label="Pending Payroll" value={data.pending_payroll} delta="1%" deltaType="neutral" onClick={() => navigate('/manager/payroll')} />
+        <StatCard label="Pending Payroll" value={data.pending_payroll} onClick={() => navigate('/manager/payroll')} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

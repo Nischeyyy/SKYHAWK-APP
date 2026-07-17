@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api/client.js';
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js';
 import PageHeader from '../components/PageHeader.jsx';
 import Modal from '../components/Modal.jsx';
 import Badge from '../components/Badge.jsx';
@@ -104,6 +105,7 @@ export default function Guards() {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+  useAutoRefresh(load, 60_000); // guards change infrequently
 
   function openCreate() {
     setForm(EMPTY_FORM);

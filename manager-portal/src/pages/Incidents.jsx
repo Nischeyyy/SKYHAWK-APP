@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { api } from '../api/client.js';
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js';
 import PageHeader from '../components/PageHeader.jsx';
 import Badge from '../components/Badge.jsx';
 import Modal from '../components/Modal.jsx';
@@ -25,6 +26,7 @@ export default function Incidents() {
     setLoading(false);
   }
   useEffect(() => { setLoading(true); load(); }, [filter]);
+  useAutoRefresh(load, 30_000); // guards file incidents in real time
 
   function openView(inc) {
     setStatusUpdate(inc.status || 'submitted');
