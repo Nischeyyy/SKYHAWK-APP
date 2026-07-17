@@ -36,7 +36,7 @@ export default function Payroll() {
 
   async function load() {
     const [pd, gd] = await Promise.all([api.payroll(filterStatus ? `?status=${filterStatus}` : ''), api.guards()]);
-    setEntries(pd.entries || []);
+    setEntries(pd.periods || pd.entries || []);
     setGuards(gd.guards || []);
     setLoading(false);
   }
