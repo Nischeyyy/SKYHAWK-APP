@@ -8,6 +8,7 @@ const http = require('http');
 
 const BACKEND_PORT = 8000;
 const FRONTEND_PORT = 8080;
+const MANAGER_PORT = 8081;
 const PROXY_PORT = 5000;
 
 function forward(req, res, targetPort) {
@@ -41,18 +42,24 @@ function forward(req, res, targetPort) {
 
 const server = http.createServer((req, res) => {
   const url = req.url || '/';
-  const isApi = url.startsWith('/api') || url.startsWith('/docs') || url.startsWith('/openapi.json');
-  // Strip Origin/Referer when forwarding to the Expo dev server so its
+  const isApi     = url.startsWith('/api') || url.startsWith('/docs') || url.startsWith('/openapi.json');
+  const isManager = url.startsWith('/manager');
+
+  // Strip Origin/Referer when forwarding to Expo / Vite dev servers so their
   // built-in CORS middleware doesn't reject Replit-proxied requests.
   if (!isApi) {
     delete req.headers['origin'];
     delete req.headers['referer'];
   }
-  forward(req, res, isApi ? BACKEND_PORT : FRONTEND_PORT);
+
+  if (isApi)     return forward(req, res, BACKEND_PORT);
+  if (isManager) return forward(req, res, MANAGER_PORT);
+  forward(req, res, FRONTEND_PORT);
 });
 
 server.listen(PROXY_PORT, '0.0.0.0', () => {
   console.log(`Proxy listening on port ${PROXY_PORT}`);
-  console.log(`  /api/* -> backend :${BACKEND_PORT}`);
-  console.log(`  /*     -> frontend :${FRONTEND_PORT}`);
+  console.log(`  /api/*     -> backend :${BACKEND_PORT}`);
+  console.log(`  /manager/* -> manager :${MANAGER_PORT}`);
+  console.log(`  /*         -> frontend :${FRONTEND_PORT}`);
 });

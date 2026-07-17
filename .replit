@@ -32,6 +32,10 @@ args = "Start application"
 task = "workflow.run"
 args = "Expo Go"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Manager Portal"
+
 [[workflows.workflow]]
 name = "Backend API"
 author = "agent"
@@ -68,6 +72,15 @@ task = "shell.exec"
 args = "cd frontend && EXPO_PUBLIC_BACKEND_URL=https://$REPLIT_DEV_DOMAIN ./node_modules/.bin/expo start --tunnel --port 8099"
 waitForPort = 8099
 
+[[workflows.workflow]]
+name = "Manager Portal"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd manager-portal && npm run build && node serve.cjs"
+waitForPort = 8081
+
 [[ports]]
 localPort = 5000
 externalPort = 80
@@ -79,6 +92,10 @@ externalPort = 8000
 [[ports]]
 localPort = 8080
 externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
 
 [deployment]
 deploymentTarget = "cloudrun"
