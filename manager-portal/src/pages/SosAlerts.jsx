@@ -26,7 +26,7 @@ export default function SosAlerts() {
   // Auto-refresh every 20s when viewing active
   useEffect(() => {
     if (tab !== 'active') return;
-    const t = setInterval(load, 20000);
+    const t = setInterval(load, 3000);
     return () => clearInterval(t);
   }, [tab]);
 
