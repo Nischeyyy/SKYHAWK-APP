@@ -133,7 +133,7 @@ export default function Layout() {
   function logout() {
     localStorage.removeItem('mgr_token');
     localStorage.removeItem('mgr_user');
-    navigate('/manager/');
+    navigate('/');
   }
 
   // Find current page title for breadcrumb

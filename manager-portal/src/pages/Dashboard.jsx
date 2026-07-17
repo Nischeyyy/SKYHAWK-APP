@@ -39,11 +39,11 @@ export default function Dashboard() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <StatCard label="Total Guards" value={data.total_guards} onClick={() => navigate('/manager/guards')} />
-        <StatCard label="Shifts Today" value={data.shifts_today} onClick={() => navigate('/manager/shifts')} />
-        <StatCard label="Clocked In" value={data.active_clocked} onClick={() => navigate('/manager/timeclock')} />
-        <StatCard label="Open Incidents" value={data.open_incidents} onClick={() => navigate('/manager/incidents')} />
-        <StatCard label="Pending Payroll" value={data.pending_payroll} onClick={() => navigate('/manager/payroll')} />
+        <StatCard label="Total Guards" value={data.total_guards} onClick={() => navigate('/guards')} />
+        <StatCard label="Shifts Today" value={data.shifts_today} onClick={() => navigate('/shifts')} />
+        <StatCard label="Clocked In" value={data.active_clocked} onClick={() => navigate('/timeclock')} />
+        <StatCard label="Open Incidents" value={data.open_incidents} onClick={() => navigate('/incidents')} />
+        <StatCard label="Pending Payroll" value={data.pending_payroll} onClick={() => navigate('/payroll')} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -83,7 +83,7 @@ export default function Dashboard() {
         <div className="card">
           <div className="flex items-center justify-between mb-6">
             <h2 className="font-semibold text-gray-900">Recent Incidents</h2>
-            <button onClick={() => navigate('/manager/incidents')} className="text-xs text-gray-500 hover:text-gray-900 font-medium uppercase tracking-wider">
+            <button onClick={() => navigate('/incidents')} className="text-xs text-gray-500 hover:text-gray-900 font-medium uppercase tracking-wider">
               View All
             </button>
           </div>
