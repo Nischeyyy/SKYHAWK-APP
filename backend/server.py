@@ -1769,7 +1769,16 @@ async def admin_get_guard(guard_id: str, admin=Depends(require_admin)):
         {"user_id": guard_id}, {"_id": 0, "selfie_in": 0, "selfie_out": 0}
     ).sort("clock_in", -1).to_list(10)
     equipment = await db.equipment.find({"user_id": guard_id}, {"_id": 0}).to_list(20)
-    return {"guard": guard, "recent_shifts": recent_shifts, "recent_clock": recent_clock, "equipment": equipment}
+    documents = await db.wallet_documents.find({"user_id": guard_id}, {"_id": 0}).sort("uploaded_at", -1).to_list(50)
+    onboarding = await db.onboarding.find_one({"user_id": guard_id}, {"_id": 0})
+    return {
+        "guard": guard,
+        "recent_shifts": recent_shifts,
+        "recent_clock": recent_clock,
+        "equipment": equipment,
+        "documents": documents,
+        "onboarding": onboarding,
+    }
 
 
 @api.put("/admin/guards/{guard_id}")
