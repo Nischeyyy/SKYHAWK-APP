@@ -1668,23 +1668,40 @@ class AdminUpdateIncidentIn(BaseModel):
     notes: Optional[str] = None
 
 
+class DeductionItem(BaseModel):
+    label: str
+    amount: float
+
+
 class AdminCreatePayrollIn(BaseModel):
     user_id: str
     period_start: str
     period_end: str
-    pay_date: str
-    hours_regular: float
+    pay_date: Optional[str] = None          # defaults to period_end if omitted
+    hours_regular: Optional[float] = None   # kept for back-compat
+    hours_worked: Optional[float] = None    # frontend-friendly alias
     hours_overtime: float = 0.0
-    pay_rate: float = 24.50
+    pay_rate: Optional[float] = None        # kept for back-compat
+    hourly_rate: Optional[float] = None     # frontend-friendly alias
+    status: str = "submitted"
+    notes: Optional[str] = None
+    deductions: List[DeductionItem] = []
+    paid_via: Optional[str] = None          # cash | cheque | direct_deposit | interac
 
 
 class AdminUpdatePayrollIn(BaseModel):
     status: Optional[str] = None
     hours_regular: Optional[float] = None
+    hours_worked: Optional[float] = None
     hours_overtime: Optional[float] = None
+    pay_rate: Optional[float] = None
+    hourly_rate: Optional[float] = None
     pay_date: Optional[str] = None
     gross: Optional[float] = None
     net: Optional[float] = None
+    notes: Optional[str] = None
+    deductions: Optional[List[DeductionItem]] = None
+    paid_via: Optional[str] = None
 
 
 class AdminUpdateTimeclockIn(BaseModel):
@@ -2036,14 +2053,23 @@ async def admin_list_payroll(
 
 @api.post("/admin/payroll", status_code=201)
 async def admin_create_payroll(body: AdminCreatePayrollIn, admin=Depends(require_admin)):
-    gross = round(body.hours_regular * body.pay_rate + body.hours_overtime * body.pay_rate * 1.5, 2)
-    net = round(gross * 0.72, 2)
+    hours_reg = body.hours_regular if body.hours_regular is not None else (body.hours_worked or 0.0)
+    rate = body.pay_rate if body.pay_rate is not None else (body.hourly_rate or 0.0)
+    gross = round(hours_reg * rate + body.hours_overtime * rate * 1.5, 2)
+    total_deductions = round(sum(d.amount for d in body.deductions), 2)
+    net = round(gross - total_deductions, 2)
     record = {
         "id": str(uuid.uuid4()), "user_id": body.user_id,
         "period_start": body.period_start, "period_end": body.period_end,
-        "pay_date": body.pay_date, "hours_regular": body.hours_regular,
-        "hours_overtime": body.hours_overtime, "gross": gross, "net": net,
-        "status": "submitted", "pay_stub_url": None,
+        "pay_date": body.pay_date or body.period_end,
+        "hours_regular": hours_reg, "hours_overtime": body.hours_overtime,
+        "pay_rate": rate, "gross": gross,
+        "deductions": [d.model_dump() for d in body.deductions],
+        "total_deductions": total_deductions,
+        "net": net,
+        "status": body.status, "notes": body.notes or "",
+        "paid_via": body.paid_via,
+        "pay_stub_url": None,
         "created_by": admin["id"], "created_at": iso(now_utc()),
     }
     await db.payroll.insert_one(record); record.pop("_id", None)
@@ -2052,7 +2078,18 @@ async def admin_create_payroll(body: AdminCreatePayrollIn, admin=Depends(require
 
 @api.put("/admin/payroll/{payroll_id}")
 async def admin_update_payroll(payroll_id: str, body: AdminUpdatePayrollIn, admin=Depends(require_admin)):
-    update = {k: v for k, v in body.model_dump().items() if v is not None}
+    raw = body.model_dump()
+    # Normalise aliased fields
+    if raw.get("hours_worked") is not None and raw.get("hours_regular") is None:
+        raw["hours_regular"] = raw["hours_worked"]
+    if raw.get("hourly_rate") is not None and raw.get("pay_rate") is None:
+        raw["pay_rate"] = raw["hourly_rate"]
+    raw.pop("hours_worked", None); raw.pop("hourly_rate", None)
+    # Serialise deduction items
+    if raw.get("deductions") is not None:
+        raw["deductions"] = [d if isinstance(d, dict) else d.model_dump() for d in raw["deductions"]]
+        raw["total_deductions"] = round(sum(d["amount"] for d in raw["deductions"]), 2)
+    update = {k: v for k, v in raw.items() if v is not None}
     if not update:
         raise HTTPException(400, "No fields to update")
     r = await db.payroll.update_one({"id": payroll_id}, {"$set": update})
