@@ -308,10 +308,10 @@ export default function Payroll() {
             <button className="btn-primary flex items-center gap-1.5" onClick={exportPDF}>
               <FileDown size={15} /> PDF
             </button>
-            <button className="btn-secondary flex items-center gap-2" onClick={openImport}>
+            <button className="btn-primary flex items-center gap-2" onClick={openImport}>
               <Upload size={16} /> Import Timesheet
             </button>
-            <button className="btn-secondary flex items-center gap-2" onClick={() => { setCalcForm({ period_start: '', period_end: '', pay_date: '', hourly_rate: '' }); setError(''); setCalcModal(true); }}>
+            <button className="btn-primary flex items-center gap-2" onClick={() => { setCalcForm({ period_start: '', period_end: '', pay_date: '', hourly_rate: '' }); setError(''); setCalcModal(true); }}>
               <Calculator size={16} /> Calculate
             </button>
             <button className="btn-primary flex items-center gap-2" onClick={openCreate}><Plus size={16} /> Add Entry</button>
@@ -389,7 +389,7 @@ export default function Payroll() {
             <option value="status">Status</option>
           </select>
           <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-            className="border border-gray-200 bg-white rounded-lg p-1.5 hover:bg-gray-50 transition-colors" title={sortDir === 'asc' ? 'Ascending' : 'Descending'}>
+            className="bg-gray-900 hover:bg-gray-700 text-white rounded-lg p-1.5 transition-colors" title={sortDir === 'asc' ? 'Ascending' : 'Descending'}>
             {sortDir === 'asc' ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
         </div>
