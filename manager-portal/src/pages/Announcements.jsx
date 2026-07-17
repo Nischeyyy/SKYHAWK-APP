@@ -3,7 +3,7 @@ import { api } from '../api/client.js';
 import PageHeader from '../components/PageHeader.jsx';
 import Modal from '../components/Modal.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import { Megaphone, Plus, Trash2 } from 'lucide-react';
+import { Megaphone, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 const EMPTY = { title: '', body: '', priority: 'normal', site_id: '' };
@@ -16,6 +16,8 @@ export default function Announcements() {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(null); // announcement object to delete
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     const [ad, sd] = await Promise.all([api.announcements(), api.sites()]);
@@ -33,9 +35,14 @@ export default function Announcements() {
     } catch (err) { setError(err.message); } finally { setSaving(false); }
   }
 
-  async function handleDelete(id) {
-    if (!confirm('Delete this announcement?')) return;
-    try { await api.deleteAnnouncement(id); await load(); } catch (err) { alert(err.message); }
+  async function confirmAndDelete() {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await api.deleteAnnouncement(confirmDelete.id);
+      setConfirmDelete(null);
+      await load();
+    } catch (err) { alert(err.message); } finally { setDeleting(false); }
   }
 
   const siteMap = Object.fromEntries(sites.map(s => [s.id, s]));
@@ -71,7 +78,7 @@ export default function Announcements() {
                       <span>{ann.created_at ? format(parseISO(ann.created_at), 'MMM d yyyy, HH:mm') : '—'}</span>
                     </div>
                   </div>
-                  <button onClick={() => handleDelete(ann.id)} className="text-gray-400 hover:text-red-500 p-2 rounded hover:bg-gray-100 transition-colors flex-shrink-0">
+                  <button onClick={() => setConfirmDelete(ann)} className="text-gray-400 hover:text-red-500 p-2 rounded hover:bg-gray-100 transition-colors flex-shrink-0" title="Delete announcement">
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -79,6 +86,45 @@ export default function Announcements() {
             ))}
           </div>
         )
+      )}
+
+      {confirmDelete && (
+        <Modal title="Delete Announcement" onClose={() => !deleting && setConfirmDelete(null)}>
+          <div className="space-y-5">
+            <div className="flex gap-4 items-start">
+              <div className="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={22} className="text-red-600" />
+              </div>
+              <div>
+                <p className="text-gray-900 font-semibold text-sm mb-1">
+                  Are you sure you want to delete this announcement?
+                </p>
+                <p className="text-gray-500 text-sm leading-relaxed">
+                  <span className="font-medium text-gray-700">"{confirmDelete.title}"</span> will be permanently removed and guards will no longer see it.
+                  <span className="block mt-1 font-semibold text-red-600">This cannot be undone.</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setConfirmDelete(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmAndDelete}
+                disabled={deleting}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-60"
+              >
+                {deleting ? 'Deleting…' : 'Yes, delete permanently'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {modal && (
