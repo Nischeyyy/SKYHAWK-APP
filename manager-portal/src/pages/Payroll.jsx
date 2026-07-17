@@ -40,7 +40,7 @@ export default function Payroll() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterGuardId, setFilterGuardId] = useState('');
+  const [filterGuardIds, setFilterGuardIds] = useState([]);
   const [guardSearchOpen, setGuardSearchOpen] = useState(false);
   const [guardSearchText, setGuardSearchText] = useState('');
   const [sortKey, setSortKey] = useState('period_start');
@@ -211,7 +211,7 @@ export default function Payroll() {
 
   // ── Filtered + sorted entries ──
   const displayedEntries = [...entries]
-    .filter(e => !filterGuardId || e.user_id === filterGuardId)
+    .filter(e => filterGuardIds.length === 0 || filterGuardIds.includes(e.user_id))
     .filter(e => {
       if (!searchText) return true;
       const q = searchText.toLowerCase();
@@ -288,7 +288,7 @@ export default function Payroll() {
 
   function exportPDF() {
     const doc = new jsPDF({ orientation: 'landscape' });
-    const guardLabel = filterGuardId ? (guardMap[filterGuardId]?.full_name || 'Guard') : 'All Guards';
+    const guardLabel = filterGuardIds.length === 0 ? 'All Guards' : filterGuardIds.map(id => guardMap[id]?.full_name || id).join(', ');
     const statusLabel = filterStatus ? filterStatus.replace(/_/g,' ') : 'All Statuses';
     doc.setFontSize(14);
     doc.text('Payroll Report', 14, 14);
@@ -345,47 +345,65 @@ export default function Payroll() {
 
       {/* ── Guard filter + sort bar ── */}
       <div className="flex gap-3 mb-5 flex-wrap items-center">
-        {/* Guard picker */}
+        {/* Guard multi-select picker */}
         <div className="relative">
-          {filterGuardId ? (
-            <div className="flex items-center gap-2 border border-blue-300 bg-blue-50 rounded-xl px-3 py-2">
-              <Users size={14} className="text-blue-600" />
-              <span className="text-sm font-medium text-blue-800">{guardMap[filterGuardId]?.full_name}</span>
-              <button onClick={() => { setFilterGuardId(''); setGuardSearchText(''); setGuardSearchOpen(false); }}
-                className="text-blue-400 hover:text-blue-700 ml-1"><X size={13} /></button>
-            </div>
-          ) : (
-            <div className="relative">
-              <button
-                onClick={() => setGuardSearchOpen(o => !o)}
-                className="flex items-center gap-2 border border-gray-200 bg-white rounded-xl px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-                <Users size={14} /> Filter by guard <ChevronDown size={13} className="text-gray-400" />
-              </button>
-              {guardSearchOpen && (
-                <div className="absolute z-30 top-full mt-1 left-0 w-64 bg-white border border-gray-200 rounded-xl shadow-lg">
-                  <div className="p-2 border-b border-gray-100">
-                    <div className="relative">
-                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input autoFocus placeholder="Search guard…" className="input pl-7 py-1.5 text-sm"
-                        value={guardSearchText} onChange={e => setGuardSearchText(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto py-1">
-                    {guards
-                      .filter(g => !guardSearchText || g.full_name?.toLowerCase().includes(guardSearchText.toLowerCase()))
-                      .map(g => (
-                        <button key={g.id} onClick={() => { setFilterGuardId(g.id); setGuardSearchOpen(false); setGuardSearchText(''); }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-gray-50">
-                          {g.full_name}
-                        </button>
-                      ))
-                    }
-                    {guards.filter(g => !guardSearchText || g.full_name?.toLowerCase().includes(guardSearchText.toLowerCase())).length === 0 && (
-                      <p className="px-4 py-2 text-xs text-gray-400">No guards found</p>
-                    )}
-                  </div>
+          <button
+            onClick={() => setGuardSearchOpen(o => !o)}
+            className={`flex items-center gap-2 border rounded-xl px-3 py-2 text-sm font-medium transition-colors ${filterGuardIds.length > 0 ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>
+            <Users size={14} />
+            {filterGuardIds.length === 0 ? 'Filter by guard' : `${filterGuardIds.length} guard${filterGuardIds.length > 1 ? 's' : ''} selected`}
+            {filterGuardIds.length > 0
+              ? <button onClick={e => { e.stopPropagation(); setFilterGuardIds([]); setGuardSearchText(''); }} className="ml-1 text-blue-400 hover:text-blue-700"><X size={13} /></button>
+              : <ChevronDown size={13} className="text-gray-400" />}
+          </button>
+
+          {guardSearchOpen && (
+            <div className="absolute z-30 top-full mt-1 left-0 w-72 bg-white border border-gray-200 rounded-xl shadow-lg">
+              {/* Search */}
+              <div className="p-2 border-b border-gray-100">
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input autoFocus placeholder="Search guard…" className="input pl-7 py-1.5 text-sm"
+                    value={guardSearchText} onChange={e => setGuardSearchText(e.target.value)} />
                 </div>
-              )}
+              </div>
+
+              {/* Select-all / clear row */}
+              <div className="flex justify-between px-3 py-1.5 border-b border-gray-100 text-xs">
+                <button onClick={() => setFilterGuardIds(guards.map(g => g.id))} className="text-blue-600 hover:text-blue-800 font-medium">Select all</button>
+                <button onClick={() => setFilterGuardIds([])} className="text-gray-400 hover:text-gray-700">Clear</button>
+              </div>
+
+              {/* Guard list with checkboxes */}
+              <div className="max-h-52 overflow-y-auto py-1">
+                {guards
+                  .filter(g => !guardSearchText || g.full_name?.toLowerCase().includes(guardSearchText.toLowerCase()))
+                  .map(g => {
+                    const checked = filterGuardIds.includes(g.id);
+                    return (
+                      <label key={g.id} className="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 accent-gray-900 cursor-pointer"
+                          checked={checked}
+                          onChange={() => setFilterGuardIds(prev =>
+                            checked ? prev.filter(id => id !== g.id) : [...prev, g.id]
+                          )}
+                        />
+                        <span className="text-sm text-gray-800">{g.full_name}</span>
+                      </label>
+                    );
+                  })
+                }
+                {guards.filter(g => !guardSearchText || g.full_name?.toLowerCase().includes(guardSearchText.toLowerCase())).length === 0 && (
+                  <p className="px-4 py-2 text-xs text-gray-400">No guards found</p>
+                )}
+              </div>
+
+              {/* Done button */}
+              <div className="p-2 border-t border-gray-100">
+                <button onClick={() => setGuardSearchOpen(false)} className="w-full btn-primary py-1.5 text-sm">Done</button>
+              </div>
             </div>
           )}
         </div>
@@ -428,8 +446,8 @@ export default function Payroll() {
 
       {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !displayedEntries.length ? (
-          entries.length && (filterGuardId || filterStatus)
-            ? <div className="text-center py-12 text-gray-400 text-sm">No entries match your filters. <button className="underline text-gray-500 hover:text-gray-800" onClick={() => { setFilterGuardId(''); setFilterStatus(''); }}>Clear filters</button></div>
+          entries.length && (filterGuardIds.length > 0 || filterStatus || searchText)
+            ? <div className="text-center py-12 text-gray-400 text-sm">No entries match your filters. <button className="underline text-gray-500 hover:text-gray-800" onClick={() => { setFilterGuardIds([]); setFilterStatus(''); setSearchText(''); }}>Clear filters</button></div>
             : <EmptyState icon={DollarSign} title="No payroll entries" />
         ) : (
           <div className="card p-0 overflow-hidden">
