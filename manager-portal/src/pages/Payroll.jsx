@@ -56,6 +56,28 @@ export default function Payroll() {
     setFeatures(prev => { const next = { ...prev, [id]: !prev[id] }; saveFeatures(next); return next; });
   }
 
+  // ── Column visibility (main table) ──
+  const TABLE_COLS = [
+    { key: 'guard',      label: 'Guard' },
+    { key: 'period',     label: 'Period' },
+    { key: 'hours',      label: 'Hours' },
+    { key: 'rate',       label: 'Rate' },
+    { key: 'gross',      label: 'Gross' },
+    { key: 'deductions', label: 'Deductions' },
+    { key: 'net',        label: 'Net Pay' },
+    { key: 'paid_via',   label: 'Paid Via' },
+    { key: 'status',     label: 'Status' },
+  ];
+  const COL_DEFAULTS = { guard: true, period: true, hours: true, rate: true, gross: true, deductions: true, net: true, paid_via: true, status: true };
+  const [colSettings, setColSettings] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem('payroll_col_settings') || 'null'); return s ? { ...COL_DEFAULTS, ...s } : COL_DEFAULTS; }
+    catch { return COL_DEFAULTS; }
+  });
+  const [colMenuOpen, setColMenuOpen] = useState(false);
+  function toggleCol(key) {
+    setColSettings(prev => { const n = { ...prev, [key]: !prev[key] }; localStorage.setItem('payroll_col_settings', JSON.stringify(n)); return n; });
+  }
+
   // ── Bulk selection ──
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -555,6 +577,42 @@ export default function Payroll() {
           )}
         </div>
 
+        {/* View (column visibility) */}
+        <div className="relative">
+          <button
+            onClick={() => setColMenuOpen(o => !o)}
+            className={`flex items-center gap-2 border rounded-xl px-3 py-2 text-sm font-medium transition-colors ${Object.values(colSettings).some(v => !v) ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>
+            <Settings2 size={14} /> View
+            {Object.values(colSettings).some(v => !v) && (
+              <span className="bg-white text-gray-900 rounded-full px-1.5 py-0.5 text-xs font-bold leading-none">
+                {Object.values(colSettings).filter(v => !v).length} hidden
+              </span>
+            )}
+          </button>
+          {colMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-20" onClick={() => setColMenuOpen(false)} />
+              <div className="absolute z-30 top-full mt-1 left-0 w-52 bg-white border border-gray-200 rounded-xl shadow-lg p-2 space-y-0.5">
+                <p className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Visible columns</p>
+                {TABLE_COLS.map(col => (
+                  <label key={col.key} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
+                      checked={!!colSettings[col.key]}
+                      onChange={() => toggleCol(col.key)} />
+                    <span className="text-sm text-gray-700">{col.label}</span>
+                  </label>
+                ))}
+                <div className="border-t border-gray-100 pt-1 mt-1">
+                  <button onClick={() => { setColSettings(COL_DEFAULTS); localStorage.setItem('payroll_col_settings', JSON.stringify(COL_DEFAULTS)); }}
+                    className="w-full text-xs text-gray-400 hover:text-gray-700 py-1 text-center transition-colors">
+                    Reset to default
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* Sort control */}
         <div className="flex items-center gap-2 ml-auto">
           {features.recurring && (
@@ -603,23 +661,23 @@ export default function Payroll() {
                         onChange={toggleSelectAll} />
                     </th>
                     {[
-                      { label: 'Guard',      key: 'guard' },
-                      { label: 'Period',     key: 'period_start' },
-                      { label: 'Hours',      key: 'hours' },
-                      { label: 'Rate',       key: 'rate' },
-                      { label: 'Gross',      key: 'gross' },
-                      { label: 'Deductions', key: null },
-                      { label: 'Net Pay',    key: 'net' },
-                      { label: 'Paid Via',   key: null },
-                      { label: 'Status',     key: 'status' },
-                      { label: '',           key: null },
-                    ].map(({ label, key }) => (
-                      <th key={label} className="table-head">
-                        {key ? (
-                          <button onClick={() => toggleSort(key)}
+                      { label: 'Guard',      key: 'guard',       sort: 'guard' },
+                      { label: 'Period',     key: 'period',      sort: 'period_start' },
+                      { label: 'Hours',      key: 'hours',       sort: 'hours' },
+                      { label: 'Rate',       key: 'rate',        sort: 'rate' },
+                      { label: 'Gross',      key: 'gross',       sort: 'gross' },
+                      { label: 'Deductions', key: 'deductions',  sort: null },
+                      { label: 'Net Pay',    key: 'net',         sort: 'net' },
+                      { label: 'Paid Via',   key: 'paid_via',    sort: null },
+                      { label: 'Status',     key: 'status',      sort: 'status' },
+                      { label: '',           key: '_actions',    sort: null },
+                    ].filter(({ key }) => key === '_actions' || colSettings[key] !== false).map(({ label, key, sort }) => (
+                      <th key={key} className="table-head">
+                        {sort ? (
+                          <button onClick={() => toggleSort(sort)}
                             className="flex items-center gap-1 font-semibold text-gray-600 hover:text-gray-900 transition-colors">
                             {label}
-                            {sortKey === key
+                            {sortKey === sort
                               ? (sortDir === 'asc' ? <ChevronUp size={13} /> : <ChevronDown size={13} />)
                               : <ChevronsUpDown size={13} className="text-gray-300" />}
                           </button>
@@ -649,23 +707,27 @@ export default function Payroll() {
                             checked={isSelected} onChange={() => toggleSelect(e.id)} />
                         </td>
 
-                        <td className="table-cell">
-                          <div className="flex items-center gap-2">
-                            <p className="text-gray-900 text-sm font-medium">{guardMap[e.user_id]?.full_name || e.guard_name_import || '—'}</p>
-                            {isAnomaly  && <span title="Anomaly detected"><AlertTriangle size={13} className="text-amber-500 flex-shrink-0" /></span>}
-                            {isOverlap  && <span title="Period overlaps another entry"><Calendar size={13} className="text-red-500 flex-shrink-0" /></span>}
-                          </div>
-                        </td>
-                        <td className="table-cell text-xs text-gray-600">
-                          {e.period_start ? format(parseISO(e.period_start), 'MMM d') : '—'} – {e.period_end ? format(parseISO(e.period_end), 'MMM d') : '—'}
-                        </td>
-                        <td className="table-cell text-sm font-mono">{hrs?.toFixed(1) ?? '—'}h</td>
-                        <td className="table-cell text-sm font-mono">${rate?.toFixed(2) ?? '—'}</td>
-                        <td className="table-cell text-sm text-gray-700 font-mono">${gross?.toFixed(2) ?? '—'}</td>
-                        <td className="table-cell text-sm font-mono text-red-600">{totalDed > 0 ? `−${totalDed.toFixed(2)}` : <span className="text-gray-300">—</span>}</td>
-                        <td className="table-cell text-sm font-bold text-gray-900">${net?.toFixed(2) ?? '—'}</td>
-                        <td className="table-cell text-xs text-gray-500">{paidViaLabel}</td>
-                        <td className="table-cell"><Badge status={e.status} /></td>
+                        {colSettings.guard !== false && (
+                          <td className="table-cell">
+                            <div className="flex items-center gap-2">
+                              <p className="text-gray-900 text-sm font-medium">{guardMap[e.user_id]?.full_name || e.guard_name_import || '—'}</p>
+                              {isAnomaly && <span title="Anomaly detected"><AlertTriangle size={13} className="text-amber-500 flex-shrink-0" /></span>}
+                              {isOverlap && <span title="Period overlaps another entry"><Calendar size={13} className="text-red-500 flex-shrink-0" /></span>}
+                            </div>
+                          </td>
+                        )}
+                        {colSettings.period !== false && (
+                          <td className="table-cell text-xs text-gray-600">
+                            {e.period_start ? format(parseISO(e.period_start), 'MMM d') : '—'} – {e.period_end ? format(parseISO(e.period_end), 'MMM d') : '—'}
+                          </td>
+                        )}
+                        {colSettings.hours      !== false && <td className="table-cell text-sm font-mono">{hrs?.toFixed(1) ?? '—'}h</td>}
+                        {colSettings.rate       !== false && <td className="table-cell text-sm font-mono">${rate?.toFixed(2) ?? '—'}</td>}
+                        {colSettings.gross      !== false && <td className="table-cell text-sm text-gray-700 font-mono">${gross?.toFixed(2) ?? '—'}</td>}
+                        {colSettings.deductions !== false && <td className="table-cell text-sm font-mono text-red-600">{totalDed > 0 ? `−${totalDed.toFixed(2)}` : <span className="text-gray-300">—</span>}</td>}
+                        {colSettings.net        !== false && <td className="table-cell text-sm font-bold text-gray-900">${net?.toFixed(2) ?? '—'}</td>}
+                        {colSettings.paid_via   !== false && <td className="table-cell text-xs text-gray-500">{paidViaLabel}</td>}
+                        {colSettings.status     !== false && <td className="table-cell"><Badge status={e.status} /></td>}
                         <td className="table-cell text-right">
                           <div className="flex items-center gap-0.5 justify-end">
                             {features.paystub && (
