@@ -6,7 +6,7 @@ import Modal from '../components/Modal.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import PayrollDashboard from '../components/PayrollDashboard.jsx';
 import PayrollFeaturePanel, { loadFeatures, saveFeatures } from '../components/PayrollFeaturePanel.jsx';
-import { DollarSign, Plus, Edit2, Calculator, Trash2, Upload, FileSpreadsheet, CheckCircle2, XCircle, Search, Users, FileDown, ChevronUp, ChevronDown, ChevronsUpDown, X, Settings2, AlertTriangle, Calendar, RefreshCw, MessageSquare, FileText, Download } from 'lucide-react';
+import { DollarSign, Plus, Edit2, Calculator, Trash2, Upload, FileSpreadsheet, CheckCircle2, XCircle, Search, Users, FileDown, ChevronUp, ChevronDown, ChevronsUpDown, X, Settings2, AlertTriangle, Calendar, RefreshCw, MessageSquare, FileText, Download, UserX, Link2 } from 'lucide-react';
 import { format, parseISO, addDays, addWeeks } from 'date-fns';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -96,6 +96,22 @@ export default function Payroll() {
       setSelectedIds(new Set());
     } finally { setBulkSaving(false); }
   }
+  // ── Link unmatched entry to guard profile ──
+  const [linkEntry, setLinkEntry] = useState(null);   // payroll entry being linked
+  const [linkGuardId, setLinkGuardId] = useState('');
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkSaving, setLinkSaving] = useState(false);
+  function openLink(e) { setLinkEntry(e); setLinkGuardId(''); setLinkSearch(''); }
+  async function handleLink() {
+    if (!linkGuardId || !linkEntry) return;
+    setLinkSaving(true);
+    try {
+      await api.updatePayroll(linkEntry.id, { user_id: linkGuardId });
+      await load();
+      setLinkEntry(null);
+    } catch (err) { alert(err.message); } finally { setLinkSaving(false); }
+  }
+
   async function bulkDelete() {
     if (!selectedIds.size) return;
     const count = selectedIds.size;
@@ -654,6 +670,20 @@ export default function Payroll() {
         <PayrollDashboard entries={entries} guardMap={guardMap} anomalyCount={anomalyIds.size} />
       )}
 
+      {/* ── Unlinked guard warning banner ── */}
+      {!loading && (() => {
+        const unlinkedCount = displayedEntries.filter(e => e.user_id?.startsWith('ext:')).length;
+        return unlinkedCount > 0 ? (
+          <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-4 text-sm">
+            <UserX size={16} className="text-orange-500 flex-shrink-0" />
+            <p className="text-orange-800 flex-1">
+              <strong>{unlinkedCount} {unlinkedCount === 1 ? 'entry has' : 'entries have'} no guard profile</strong>
+              {' '}— these won't appear in the mobile app until linked. Click <Link2 size={12} className="inline text-orange-600" /> on each row to link them to a guard account.
+            </p>
+          </div>
+        ) : null;
+      })()}
+
       {loading ? <div className="text-gray-400 text-sm">Loading…</div> : (
         !displayedEntries.length ? (
           entries.length && (filterGuardIds.length > 0 || filterStatus || searchText)
@@ -710,9 +740,10 @@ export default function Payroll() {
                     const isAnomaly  = features.anomaly  && anomalyIds.has(e.id);
                     const isOverlap  = features.overlap  && overlapIds.has(e.id);
                     const isSelected = selectedIds.has(e.id);
+                    const isUnlinked = e.user_id?.startsWith('ext:');
                     return (
                       <tr key={e.id}
-                        className={`transition-colors ${isSelected ? 'bg-gray-900/5' : isAnomaly ? 'bg-amber-50 hover:bg-amber-100/60' : isOverlap ? 'bg-red-50 hover:bg-red-100/60' : 'hover:bg-gray-50/50'}`}>
+                        className={`transition-colors ${isSelected ? 'bg-gray-900/5' : isUnlinked ? 'bg-orange-50 hover:bg-orange-100/60' : isAnomaly ? 'bg-amber-50 hover:bg-amber-100/60' : isOverlap ? 'bg-red-50 hover:bg-red-100/60' : 'hover:bg-gray-50/50'}`}>
 
                         {/* Bulk checkbox */}
                         <td className="table-cell">
@@ -724,8 +755,9 @@ export default function Payroll() {
                           <td className="table-cell">
                             <div className="flex items-center gap-2">
                               <p className="text-gray-900 text-sm font-medium">{guardMap[e.user_id]?.full_name || e.guard_name_import || '—'}</p>
-                              {isAnomaly && <span title="Anomaly detected"><AlertTriangle size={13} className="text-amber-500 flex-shrink-0" /></span>}
-                              {isOverlap && <span title="Period overlaps another entry"><Calendar size={13} className="text-red-500 flex-shrink-0" /></span>}
+                              {isUnlinked && <span title="No guard profile — won't appear in mobile app"><UserX size={13} className="text-orange-500 flex-shrink-0" /></span>}
+                              {isAnomaly  && <span title="Anomaly detected"><AlertTriangle size={13} className="text-amber-500 flex-shrink-0" /></span>}
+                              {isOverlap  && <span title="Period overlaps another entry"><Calendar size={13} className="text-red-500 flex-shrink-0" /></span>}
                             </div>
                           </td>
                         )}
@@ -751,6 +783,12 @@ export default function Payroll() {
                         )}
                         <td className="table-cell text-right">
                           <div className="flex items-center gap-0.5 justify-end">
+                            {isUnlinked && (
+                              <button onClick={() => openLink(e)} title="Link to guard profile"
+                                className="text-orange-400 hover:text-orange-700 p-1.5 rounded transition-colors">
+                                <Link2 size={15} />
+                              </button>
+                            )}
                             {features.paystub && (
                               <a href={`/api/payroll/${e.id}/stub`} target="_blank" rel="noreferrer"
                                 title="Download pay stub"
@@ -802,6 +840,52 @@ export default function Payroll() {
             <X size={16} />
           </button>
         </div>
+      )}
+
+      {/* ── Link Guard modal ── */}
+      {linkEntry && (
+        <Modal title="Link to Guard Profile" onClose={() => setLinkEntry(null)}>
+          <div className="space-y-4">
+            <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-sm text-orange-800">
+              <p className="font-semibold mb-0.5">{linkEntry.guard_name_import || linkEntry.lic_number}</p>
+              <p className="text-xs text-orange-600">Lic # {linkEntry.lic_number} · imported from timesheet · not matched to any profile</p>
+            </div>
+
+            <div>
+              <label className="label">Search guard directory</label>
+              <div className="relative mb-2">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input autoFocus placeholder="Name or licence number…" className="input pl-8"
+                  value={linkSearch} onChange={e => setLinkSearch(e.target.value)} />
+              </div>
+              <div className="border border-gray-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+                {guards
+                  .filter(g => !linkSearch || g.full_name?.toLowerCase().includes(linkSearch.toLowerCase()) || g.licence_number?.includes(linkSearch))
+                  .map(g => (
+                    <label key={g.id}
+                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${linkGuardId === g.id ? 'bg-gray-900 text-white' : 'hover:bg-gray-50'}`}>
+                      <input type="radio" name="link_guard" className="w-4 h-4 accent-gray-900"
+                        checked={linkGuardId === g.id} onChange={() => setLinkGuardId(g.id)} />
+                      <div>
+                        <p className={`text-sm font-medium ${linkGuardId === g.id ? 'text-white' : 'text-gray-900'}`}>{g.full_name}</p>
+                        {g.licence_number && <p className={`text-xs font-mono ${linkGuardId === g.id ? 'text-gray-300' : 'text-gray-400'}`}>Lic # {g.licence_number}</p>}
+                      </div>
+                    </label>
+                  ))}
+                {guards.filter(g => !linkSearch || g.full_name?.toLowerCase().includes(linkSearch.toLowerCase()) || g.licence_number?.includes(linkSearch)).length === 0 && (
+                  <p className="text-center py-6 text-sm text-gray-400">No guards match — check the Guards directory.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+              <button className="btn-secondary" onClick={() => setLinkEntry(null)}>Cancel</button>
+              <button className="btn-primary flex items-center gap-2" disabled={!linkGuardId || linkSaving} onClick={handleLink}>
+                <Link2 size={15} /> {linkSaving ? 'Linking…' : 'Link to this guard'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {modal === 'entry' && (

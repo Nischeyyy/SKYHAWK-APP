@@ -1693,6 +1693,7 @@ class AdminCreatePayrollIn(BaseModel):
 
 class AdminUpdatePayrollIn(BaseModel):
     status: Optional[str] = None
+    user_id: Optional[str] = None
     hours_regular: Optional[float] = None
     hours_worked: Optional[float] = None
     hours_overtime: Optional[float] = None
