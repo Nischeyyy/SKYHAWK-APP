@@ -67,8 +67,10 @@ export default function Payroll() {
     { key: 'net',        label: 'Net Pay' },
     { key: 'paid_via',   label: 'Paid Via' },
     { key: 'status',     label: 'Status' },
+    { key: 'lic',        label: 'Lic #',    group: 'Timesheet' },
+    { key: 'projects',   label: 'Projects', group: 'Timesheet' },
   ];
-  const COL_DEFAULTS = { guard: true, period: true, hours: true, rate: true, gross: true, deductions: true, net: true, paid_via: true, status: true };
+  const COL_DEFAULTS = { guard: true, period: true, hours: true, rate: true, gross: true, deductions: true, net: true, paid_via: true, status: true, lic: false, projects: false };
   const [colSettings, setColSettings] = useState(() => {
     try { const s = JSON.parse(localStorage.getItem('payroll_col_settings') || 'null'); return s ? { ...COL_DEFAULTS, ...s } : COL_DEFAULTS; }
     catch { return COL_DEFAULTS; }
@@ -592,9 +594,18 @@ export default function Payroll() {
           {colMenuOpen && (
             <>
               <div className="fixed inset-0 z-20" onClick={() => setColMenuOpen(false)} />
-              <div className="absolute z-30 top-full mt-1 left-0 w-52 bg-white border border-gray-200 rounded-xl shadow-lg p-2 space-y-0.5">
-                <p className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Visible columns</p>
-                {TABLE_COLS.map(col => (
+              <div className="absolute z-30 top-full mt-1 left-0 w-56 bg-white border border-gray-200 rounded-xl shadow-lg p-2 space-y-0.5">
+                <p className="px-2 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">Standard columns</p>
+                {TABLE_COLS.filter(c => !c.group).map(col => (
+                  <label key={col.key} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
+                      checked={!!colSettings[col.key]}
+                      onChange={() => toggleCol(col.key)} />
+                    <span className="text-sm text-gray-700">{col.label}</span>
+                  </label>
+                ))}
+                <p className="px-2 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider border-t border-gray-100 mt-1">Timesheet columns</p>
+                {TABLE_COLS.filter(c => c.group === 'Timesheet').map(col => (
                   <label key={col.key} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
                       checked={!!colSettings[col.key]}
@@ -670,6 +681,8 @@ export default function Payroll() {
                       { label: 'Net Pay',    key: 'net',         sort: 'net' },
                       { label: 'Paid Via',   key: 'paid_via',    sort: null },
                       { label: 'Status',     key: 'status',      sort: 'status' },
+                      { label: 'Lic #',      key: 'lic',         sort: null },
+                      { label: 'Projects',   key: 'projects',    sort: null },
                       { label: '',           key: '_actions',    sort: null },
                     ].filter(({ key }) => key === '_actions' || colSettings[key] !== false).map(({ label, key, sort }) => (
                       <th key={key} className="table-head">
@@ -728,6 +741,14 @@ export default function Payroll() {
                         {colSettings.net        !== false && <td className="table-cell text-sm font-bold text-gray-900">${net?.toFixed(2) ?? '—'}</td>}
                         {colSettings.paid_via   !== false && <td className="table-cell text-xs text-gray-500">{paidViaLabel}</td>}
                         {colSettings.status     !== false && <td className="table-cell"><Badge status={e.status} /></td>}
+                        {colSettings.lic      && <td className="table-cell font-mono text-xs text-gray-500">{e.lic_number || '—'}</td>}
+                        {colSettings.projects && (
+                          <td className="table-cell text-xs text-gray-500">
+                            {e.notes
+                              ? e.notes.replace(/^Imported from timesheet\s*·?\s*\d+\s*shifts?\s*·?\s*/i, '').replace(/·\s*$/, '').trim() || '—'
+                              : '—'}
+                          </td>
+                        )}
                         <td className="table-cell text-right">
                           <div className="flex items-center gap-0.5 justify-end">
                             {features.paystub && (
