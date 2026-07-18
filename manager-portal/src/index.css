@@ -31,7 +31,7 @@
     @apply block text-sm font-medium text-gray-600 mb-1;
   }
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center text-xs font-medium capitalize;
   }
   .table-cell {
     @apply px-4 py-3 text-sm text-gray-700;

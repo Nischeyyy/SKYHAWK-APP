@@ -1528,12 +1528,13 @@ export default function Payroll() {
           : '';
 
         const STATUS_COLOURS = {
-          submitted:    'bg-blue-50 text-blue-700',
-          under_review: 'bg-amber-50 text-amber-700',
-          approved:     'bg-green-50 text-green-700',
-          paid:         'bg-emerald-100 text-emerald-800',
+          submitted:    'text-yellow-700',
+          under_review: 'text-purple-600',
+          approved:     'text-green-600',
+          paid:         'text-emerald-700',
+          cancelled:    'text-gray-400',
         };
-        const statusColour = STATUS_COLOURS[de.status] || 'bg-gray-100 text-gray-600';
+        const statusColour = STATUS_COLOURS[de.status] || 'text-gray-500';
 
         return (
           <>
