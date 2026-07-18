@@ -125,6 +125,28 @@ export default function Payroll() {
   const [importError, setImportError] = useState('');
   const [importGlobalRate, setImportGlobalRate] = useState('');
 
+  // ── Timesheet column settings ──
+  const TS_COLS = [
+    { key: 'guard_name', label: 'Guard Name' },
+    { key: 'lic',        label: 'Licence #' },
+    { key: 'status',     label: 'Match Status' },
+    { key: 'shifts',     label: 'Shifts' },
+    { key: 'hours',      label: 'Hours' },
+    { key: 'period',     label: 'Period' },
+    { key: 'projects',   label: 'Projects' },
+    { key: 'rate',       label: 'Rate ($/hr)' },
+    { key: 'gross',      label: 'Est. Gross' },
+  ];
+  const TS_DEFAULTS = { guard_name: true, lic: true, status: true, shifts: true, hours: true, period: true, projects: false, rate: true, gross: true };
+  const [tsSettings, setTsSettings] = useState(() => {
+    try { const s = JSON.parse(localStorage.getItem('ts_col_settings') || 'null'); return s ? { ...TS_DEFAULTS, ...s } : TS_DEFAULTS; }
+    catch { return TS_DEFAULTS; }
+  });
+  const [tsSettingsOpen, setTsSettingsOpen] = useState(false);
+  function toggleTsCol(key) {
+    setTsSettings(prev => { const n = { ...prev, [key]: !prev[key] }; localStorage.setItem('ts_col_settings', JSON.stringify(n)); return n; });
+  }
+
   async function load() {
     const [pd, gd] = await Promise.all([api.payroll(filterStatus ? `?status=${filterStatus}` : ''), api.guards()]);
     setEntries(pd.periods || pd.entries || []);
@@ -629,7 +651,7 @@ export default function Payroll() {
 
                         <td className="table-cell">
                           <div className="flex items-center gap-2">
-                            <p className="text-gray-900 text-sm font-medium">{guardMap[e.user_id]?.full_name || '—'}</p>
+                            <p className="text-gray-900 text-sm font-medium">{guardMap[e.user_id]?.full_name || e.guard_name_import || '—'}</p>
                             {isAnomaly  && <span title="Anomaly detected"><AlertTriangle size={13} className="text-amber-500 flex-shrink-0" /></span>}
                             {isOverlap  && <span title="Period overlaps another entry"><Calendar size={13} className="text-red-500 flex-shrink-0" /></span>}
                           </div>
@@ -923,6 +945,28 @@ export default function Payroll() {
               <p className="text-xs text-gray-400 mt-1">You can override per-guard in the next step.</p>
             </div>
 
+            {/* Timesheet Settings */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <button type="button"
+                onClick={() => setTsSettingsOpen(p => !p)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+                <span className="flex items-center gap-2"><Settings2 size={15} /> Timesheet Settings — visible columns</span>
+                {tsSettingsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              </button>
+              {tsSettingsOpen && (
+                <div className="px-4 pb-4 pt-1 border-t border-gray-100 grid grid-cols-3 gap-2">
+                  {TS_COLS.map(col => (
+                    <label key={col.key} className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700">
+                      <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
+                        checked={!!tsSettings[col.key]}
+                        onChange={() => toggleTsCol(col.key)} />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
               <button type="button" className="btn-secondary" onClick={closeImport}>Cancel</button>
               <button type="submit" className="btn-primary flex items-center gap-2" disabled={importParsing || !importFile}>
@@ -987,59 +1031,70 @@ export default function Payroll() {
                   <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
                     <tr>
                       <th className="table-head w-8 text-center">✓</th>
-                      <th className="table-head">Guard Name</th>
-                      <th className="table-head">Lic #</th>
-                      <th className="table-head text-center">Status</th>
-                      <th className="table-head text-right">Shifts</th>
-                      <th className="table-head text-right">Hours</th>
-                      <th className="table-head">Period</th>
-                      <th className="table-head text-right">Rate ($/hr)</th>
-                      <th className="table-head text-right">Est. Gross</th>
+                      {tsSettings.guard_name && <th className="table-head">Guard Name</th>}
+                      {tsSettings.lic        && <th className="table-head">Lic #</th>}
+                      {tsSettings.status     && <th className="table-head text-center">Status</th>}
+                      {tsSettings.shifts     && <th className="table-head text-right">Shifts</th>}
+                      {tsSettings.hours      && <th className="table-head text-right">Hours</th>}
+                      {tsSettings.period     && <th className="table-head">Period</th>}
+                      {tsSettings.projects   && <th className="table-head">Projects</th>}
+                      {tsSettings.rate       && <th className="table-head text-right">Rate ($/hr)</th>}
+                      {tsSettings.gross      && <th className="table-head text-right">Est. Gross</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filtered.map((row, fi) => {
                       const realIdx = importRows.findIndex(r => r.lic_number === row.lic_number);
                       const gross = row.total_hours * (Number(row.pay_rate) || 0);
+                      const visibleCols = 1 + Object.values(tsSettings).filter(Boolean).length;
                       return (
                         <tr key={row.lic_number} className={`transition-colors ${row.included ? 'hover:bg-gray-50' : 'opacity-40 bg-gray-50'}`}>
                           <td className="table-cell text-center">
                             <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
                               checked={row.included} onChange={e => updateImportRow(realIdx, 'included', e.target.checked)} />
                           </td>
-                          <td className="table-cell font-medium text-gray-900">{row.guard_name}</td>
-                          <td className="table-cell font-mono text-gray-500 text-xs">{row.lic_number}</td>
-                          <td className="table-cell text-center">
-                            {row.matched ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
-                                <CheckCircle2 size={11} /> Matched
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
-                                <Users size={11} /> New
-                              </span>
-                            )}
-                          </td>
-                          <td className="table-cell text-right text-gray-600">{row.shift_count}</td>
-                          <td className="table-cell text-right font-mono">{row.total_hours.toFixed(1)}h</td>
-                          <td className="table-cell text-xs text-gray-500">
-                            {row.period_start ? row.period_start.slice(5) : '—'} → {row.period_end ? row.period_end.slice(5) : '—'}
-                          </td>
-                          <td className="table-cell text-right">
-                            <div className="relative w-24 ml-auto">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                              <input type="number" step="0.01" min="0"
-                                className="input pl-4 py-1 text-xs text-right w-full font-mono"
-                                value={row.pay_rate}
-                                onChange={e => updateImportRow(realIdx, 'pay_rate', e.target.value)} />
-                            </div>
-                          </td>
-                          <td className="table-cell text-right font-semibold text-gray-900">${gross.toFixed(2)}</td>
+                          {tsSettings.guard_name && <td className="table-cell font-medium text-gray-900">{row.guard_name}</td>}
+                          {tsSettings.lic        && <td className="table-cell font-mono text-gray-500 text-xs">{row.lic_number}</td>}
+                          {tsSettings.status     && (
+                            <td className="table-cell text-center">
+                              {row.matched ? (
+                                <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                                  <CheckCircle2 size={11} /> Matched
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                                  <Users size={11} /> New
+                                </span>
+                              )}
+                            </td>
+                          )}
+                          {tsSettings.shifts   && <td className="table-cell text-right text-gray-600">{row.shift_count}</td>}
+                          {tsSettings.hours    && <td className="table-cell text-right font-mono">{row.total_hours.toFixed(1)}h</td>}
+                          {tsSettings.period   && (
+                            <td className="table-cell text-xs text-gray-500">
+                              {row.period_start ? row.period_start.slice(5) : '—'} → {row.period_end ? row.period_end.slice(5) : '—'}
+                            </td>
+                          )}
+                          {tsSettings.projects && (
+                            <td className="table-cell text-xs text-gray-500">{(row.projects || []).slice(0, 3).join(', ') || '—'}</td>
+                          )}
+                          {tsSettings.rate && (
+                            <td className="table-cell text-right">
+                              <div className="relative w-24 ml-auto">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                                <input type="number" step="0.01" min="0"
+                                  className="input pl-4 py-1 text-xs text-right w-full font-mono"
+                                  value={row.pay_rate}
+                                  onChange={e => updateImportRow(realIdx, 'pay_rate', e.target.value)} />
+                              </div>
+                            </td>
+                          )}
+                          {tsSettings.gross && <td className="table-cell text-right font-semibold text-gray-900">${gross.toFixed(2)}</td>}
                         </tr>
                       );
                     })}
                     {filtered.length === 0 && (
-                      <tr><td colSpan={9} className="text-center py-8 text-gray-400 text-sm">No guards match your search.</td></tr>
+                      <tr><td colSpan={1 + Object.values(tsSettings).filter(Boolean).length} className="text-center py-8 text-gray-400 text-sm">No guards match your search.</td></tr>
                     )}
                   </tbody>
                 </table>
