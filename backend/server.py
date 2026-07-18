@@ -2157,6 +2157,7 @@ def _parse_timesheet_xlsx(data: bytes, from_date=None, to_date=None):
             "guard_name":   g["guard_name"],
             "total_hours":  round(g["total_hours"], 2),
             "shift_count":  g["shift_count"],
+            "shift_dates":  ds,
             "period_start": ds[0]  if ds else None,
             "period_end":   ds[-1] if ds else None,
             "projects":     g["projects"][:5],
@@ -2221,6 +2222,8 @@ class BulkPayrollEntryIn(BaseModel):
     hours_regular: float
     pay_rate:     float
     notes:        Optional[str] = ""
+    shift_count:  Optional[int] = None
+    shift_dates:  Optional[List[str]] = None
 
 
 @api.post("/admin/payroll/bulk-create", status_code=201)
@@ -2248,6 +2251,8 @@ async def bulk_create_payroll(entries: List[BulkPayrollEntryIn], admin=Depends(r
             "paid_via":         None,
             "pay_stub_url":     None,
             "imported":         True,
+            "shift_count":      e.shift_count,
+            "shift_dates":      e.shift_dates or [],
             "created_by":       admin["id"],
             "created_at":       iso(now_utc()),
         })

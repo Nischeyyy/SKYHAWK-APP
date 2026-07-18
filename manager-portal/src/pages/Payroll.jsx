@@ -80,6 +80,9 @@ export default function Payroll() {
     setColSettings(prev => { const n = { ...prev, [key]: !prev[key] }; localStorage.setItem('payroll_col_settings', JSON.stringify(n)); return n; });
   }
 
+  // ── Detail drawer ──
+  const [detailEntry, setDetailEntry] = useState(null);
+
   // ── Bulk selection ──
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -287,6 +290,8 @@ export default function Payroll() {
         period_start: r.period_start, period_end: r.period_end,
         hours_regular: r.total_hours,
         pay_rate: Number(r.pay_rate) || 0,
+        shift_count: r.shift_count || 0,
+        shift_dates: r.shift_dates || [],
         notes: `Imported from timesheet · ${r.shift_count} shift${r.shift_count !== 1 ? 's' : ''} · ${r.projects?.slice(0,3).join(', ') || ''}`.trim().replace(/·\s*$/, ''),
       }));
       const res = await api.bulkCreatePayroll(entries);
@@ -774,11 +779,11 @@ export default function Payroll() {
                     const isSelected = selectedIds.has(e.id);
                     const isUnlinked = e.user_id?.startsWith('ext:');
                     return (
-                      <tr key={e.id}
-                        className={`transition-colors ${isSelected ? 'bg-gray-900/5' : isUnlinked ? 'bg-orange-50 hover:bg-orange-100/60' : isAnomaly ? 'bg-amber-50 hover:bg-amber-100/60' : isOverlap ? 'bg-red-50 hover:bg-red-100/60' : 'hover:bg-gray-50/50'}`}>
+                      <tr key={e.id} onClick={() => setDetailEntry(e)}
+                        className={`cursor-pointer transition-colors ${isSelected ? 'bg-gray-900/5' : isUnlinked ? 'bg-orange-50 hover:bg-orange-100/60' : isAnomaly ? 'bg-amber-50 hover:bg-amber-100/60' : isOverlap ? 'bg-red-50 hover:bg-red-100/60' : 'hover:bg-gray-50/50'}`}>
 
                         {/* Bulk checkbox */}
-                        <td className="table-cell">
+                        <td className="table-cell" onClick={ev => ev.stopPropagation()}>
                           <input type="checkbox" className="w-4 h-4 accent-gray-900 cursor-pointer"
                             checked={isSelected} onChange={() => toggleSelect(e.id)} />
                         </td>
@@ -813,7 +818,7 @@ export default function Payroll() {
                               : '—'}
                           </td>
                         )}
-                        <td className="table-cell text-right">
+                        <td className="table-cell text-right" onClick={ev => ev.stopPropagation()}>
                           <div className="flex items-center gap-0.5 justify-end">
                             {isUnlinked && (
                               <button onClick={() => openLink(e)} title="Link to guard profile"
@@ -1499,6 +1504,201 @@ export default function Payroll() {
           onClose={() => setFeaturePanelOpen(false)}
         />
       )}
+
+      {/* ── Entry detail drawer ── */}
+      {detailEntry && (() => {
+        const de = detailEntry;
+        const guard = guardMap[de.user_id];
+        const guardName = guard?.full_name || de.guard_name_import || '—';
+        const initials = guardName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const hrs  = de.hours_regular ?? de.hours_worked ?? 0;
+        const otHrs = de.hours_overtime ?? 0;
+        const rate = de.pay_rate ?? de.hourly_rate ?? 0;
+        const regGross = hrs * rate;
+        const otGross  = otHrs * rate * 1.5;
+        const gross = de.gross ?? de.gross_pay ?? (regGross + otGross);
+        const deductions = de.deductions || [];
+        const totalDed = de.total_deductions ?? deductions.reduce((s, d) => s + (d.amount || 0), 0);
+        const net = de.net ?? (gross - totalDed);
+        const isUnlinked = de.user_id?.startsWith('ext:');
+
+        // Parse projects from notes if not stored separately
+        const projectsFromNotes = de.notes
+          ? de.notes.replace(/^Imported from timesheet\s*·?\s*\d+\s*shifts?\s*·?\s*/i, '').replace(/·\s*$/, '').trim()
+          : '';
+
+        const STATUS_COLOURS = {
+          submitted:    'bg-blue-50 text-blue-700',
+          under_review: 'bg-amber-50 text-amber-700',
+          approved:     'bg-green-50 text-green-700',
+          paid:         'bg-emerald-100 text-emerald-800',
+        };
+        const statusColour = STATUS_COLOURS[de.status] || 'bg-gray-100 text-gray-600';
+
+        return (
+          <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
+              onClick={() => setDetailEntry(null)} />
+
+            {/* Drawer */}
+            <div className="fixed right-0 top-0 h-full z-50 w-full max-w-md bg-white shadow-2xl flex flex-col overflow-hidden">
+
+              {/* Header */}
+              <div className="flex items-start gap-4 px-6 pt-6 pb-5 border-b border-gray-100">
+                <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                  {initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-bold text-gray-900 truncate">{guardName}</h2>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    {de.lic_number && <span className="text-xs text-gray-400 font-mono">Lic # {de.lic_number}</span>}
+                    {isUnlinked && <span className="text-xs text-orange-500 flex items-center gap-1"><UserX size={11} /> No profile</span>}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColour}`}>
+                      {de.status?.replace('_', ' ')}
+                    </span>
+                  </div>
+                </div>
+                <button onClick={() => setDetailEntry(null)} className="text-gray-300 hover:text-gray-700 transition-colors mt-0.5">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+
+                {/* Period */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Period</p>
+                  <div className="flex items-center gap-3 text-sm text-gray-700">
+                    <span>{de.period_start ? format(parseISO(de.period_start), 'MMM d, yyyy') : '—'}</span>
+                    <span className="text-gray-300">→</span>
+                    <span>{de.period_end   ? format(parseISO(de.period_end),   'MMM d, yyyy') : '—'}</span>
+                  </div>
+                  {de.pay_date && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Pay date: {format(parseISO(de.pay_date), 'MMM d, yyyy')}
+                    </p>
+                  )}
+                </div>
+
+                {/* Shift dates (timesheet imports) */}
+                {de.shift_dates?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                      Shifts from timesheet — {de.shift_dates.length} shift{de.shift_dates.length !== 1 ? 's' : ''}
+                    </p>
+                    <div className="border border-gray-100 rounded-xl overflow-hidden">
+                      {de.shift_dates.map((d, i) => (
+                        <div key={i} className={`flex items-center justify-between px-4 py-2.5 text-sm ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                          <div className="flex items-center gap-3">
+                            <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center">
+                              <span className="text-xs font-semibold text-gray-500">{i + 1}</span>
+                            </div>
+                            <span className="text-gray-800 font-medium">
+                              {format(parseISO(d), 'EEE, MMM d yyyy')}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-400 font-mono">
+                            ~{(hrs / de.shift_dates.length).toFixed(1)}h
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {projectsFromNotes && (
+                      <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                        <span className="font-medium text-gray-500">Projects:</span> {projectsFromNotes}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* If no shift_dates but has shift_count from notes */}
+                {!de.shift_dates?.length && de.notes?.includes('shift') && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Timesheet summary</p>
+                    <p className="text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-3">{de.notes}</p>
+                  </div>
+                )}
+
+                {/* Pay breakdown */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Pay breakdown</p>
+                  <div className="border border-gray-100 rounded-xl overflow-hidden text-sm">
+                    {/* Regular */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+                      <span className="text-gray-600">Regular hours</span>
+                      <div className="text-right">
+                        <span className="text-gray-400 text-xs mr-2">{hrs.toFixed(1)}h × ${rate.toFixed(2)}/hr</span>
+                        <span className="text-gray-900 font-medium">${regGross.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    {/* Overtime */}
+                    {otHrs > 0 && (
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+                        <span className="text-gray-600">Overtime hours</span>
+                        <div className="text-right">
+                          <span className="text-gray-400 text-xs mr-2">{otHrs.toFixed(1)}h × ${(rate * 1.5).toFixed(2)}/hr</span>
+                          <span className="text-gray-900 font-medium">${otGross.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+                    {/* Gross */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                      <span className="text-gray-700 font-medium">Gross pay</span>
+                      <span className="text-gray-900 font-semibold">${gross.toFixed(2)}</span>
+                    </div>
+                    {/* Deductions */}
+                    {deductions.length > 0 ? deductions.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+                        <span className="text-gray-500">{d.label || 'Deduction'}</span>
+                        <span className="text-red-500 font-medium">−${(d.amount || 0).toFixed(2)}</span>
+                      </div>
+                    )) : totalDed > 0 ? (
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+                        <span className="text-gray-500">Deductions</span>
+                        <span className="text-red-500 font-medium">−${totalDed.toFixed(2)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+                        <span className="text-gray-400 text-xs">No deductions</span>
+                        <span className="text-gray-300 text-xs">—</span>
+                      </div>
+                    )}
+                    {/* Net */}
+                    <div className="flex items-center justify-between px-4 py-3.5 bg-gray-900">
+                      <span className="text-white font-semibold">Net pay</span>
+                      <span className="text-white font-bold text-base">${net.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {de.notes && !de.notes.includes('Imported from timesheet') && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Notes</p>
+                    <p className="text-sm text-gray-600 bg-gray-50 rounded-xl px-4 py-3 leading-relaxed">{de.notes}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer actions */}
+              <div className="px-6 py-4 border-t border-gray-100 flex items-center gap-3">
+                <button onClick={() => { setDetailEntry(null); openEdit(de); }}
+                  className="flex-1 flex items-center justify-center gap-2 btn-secondary text-sm">
+                  <Edit2 size={14} /> Edit entry
+                </button>
+                {isUnlinked && (
+                  <button onClick={() => { setDetailEntry(null); openLink(de); }}
+                    className="flex-1 flex items-center justify-center gap-2 text-sm px-4 py-2 rounded-lg border border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100 transition-colors font-medium">
+                    <Link2 size={14} /> Link to guard
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
