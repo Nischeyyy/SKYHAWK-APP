@@ -2,13 +2,12 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, MapPin, Calendar, Briefcase,
   ArrowLeftRight, Clock, FileText, AlertTriangle, DollarSign,
-  Megaphone, ShieldCheck, Radio, LogOut, Menu, X, Bird, Search,
+  Megaphone, ShieldCheck, Radio, LogOut, Menu, X, Bird,
   ChevronDown, PhoneCall
 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../api/client.js';
 
-// --- Audio alarm using Web Audio API (no external files needed) ---
 function playAlarm() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -26,9 +25,7 @@ function playAlarm() {
       osc.start(ctx.currentTime + t);
       osc.stop(ctx.currentTime + t + 0.3);
     });
-  } catch (_) {
-    // Audio not available — silent fallback
-  }
+  } catch (_) {}
 }
 
 const NAV_GROUPS = [
@@ -104,7 +101,6 @@ export default function Layout() {
   const prevSosCount = useRef(0);
   const user = JSON.parse(localStorage.getItem('mgr_user') || '{}');
 
-  // Reset banner dismiss when new alert comes in
   const sosCount = sosAlerts.length;
   useEffect(() => {
     if (sosCount > prevSosCount.current) {
@@ -114,14 +110,11 @@ export default function Layout() {
     prevSosCount.current = sosCount;
   }, [sosCount]);
 
-  // Global SOS poll — every 4 seconds, always, regardless of which page is open
   const pollSos = useCallback(async () => {
     try {
       const data = await api.sosActive();
       setSosAlerts(data.alerts || []);
-    } catch (_) {
-      // network error — keep last state
-    }
+    } catch (_) {}
   }, []);
 
   useEffect(() => {
@@ -136,7 +129,6 @@ export default function Layout() {
     navigate('/');
   }
 
-  // Find current page title for breadcrumb
   let currentPageTitle = 'Dashboard';
   for (const group of NAV_GROUPS) {
     const found = group.items.find(item => location.pathname.includes(item.to));
@@ -155,9 +147,9 @@ export default function Layout() {
         </div>
         <div className="flex-1">
           <p className="font-bold text-gray-900 text-sm leading-tight">Skyhawk</p>
-          <p className="text-xs text-gray-500">Manager Portal</p>
+          <p className="text-xs text-gray-400">Manager Portal</p>
         </div>
-        <ChevronDown size={14} className="text-gray-400" />
+        <ChevronDown size={14} className="text-gray-300" />
       </div>
 
       {/* Nav */}
@@ -189,9 +181,9 @@ export default function Layout() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">{user.full_name || 'Admin'}</p>
-            <p className="text-xs text-gray-500 truncate">{user.email || ''}</p>
+            <p className="text-xs text-gray-400 truncate">{user.email || ''}</p>
           </div>
-          <button onClick={logout} title="Sign out" className="text-gray-400 hover:text-red-500 transition-colors">
+          <button onClick={logout} title="Sign out" className="text-gray-300 hover:text-red-500 transition-colors">
             <LogOut size={16} />
           </button>
         </div>
@@ -200,16 +192,16 @@ export default function Layout() {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
+    <div className="flex h-screen overflow-hidden bg-white">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-[220px] flex-shrink-0 bg-white border-r border-gray-200 shadow-sm z-10">
+      <aside className="hidden lg:flex flex-col w-[220px] flex-shrink-0 bg-white border-r border-gray-100 z-10">
         {sidebar}
       </aside>
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-40 flex">
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
           <aside className="relative z-50 flex flex-col w-64 bg-white shadow-xl">
             <button onClick={() => setSidebarOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-900">
               <X size={20} />
@@ -220,7 +212,7 @@ export default function Layout() {
       )}
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
 
         {/* === GLOBAL SOS EMERGENCY BANNER === */}
         {showBanner && (
@@ -243,7 +235,7 @@ export default function Layout() {
             <button
               onClick={() => setSosBannerDismissed(true)}
               className="flex-shrink-0 text-red-200 hover:text-white transition-colors"
-              title="Dismiss banner (alert still active)"
+              title="Dismiss banner"
             >
               <X size={18} />
             </button>
@@ -251,9 +243,9 @@ export default function Layout() {
         )}
 
         {/* Mobile top bar */}
-        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className="text-gray-600 hover:text-gray-900">
+            <button onClick={() => setSidebarOpen(true)} className="text-gray-500 hover:text-gray-900">
               <Menu size={22} />
             </button>
             <div className="flex items-center gap-2">
@@ -279,25 +271,17 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* Desktop Top Header */}
-        <header className="hidden lg:flex items-center justify-between px-8 py-4 bg-gray-50 flex-shrink-0">
+        {/* Desktop top bar — breadcrumb only */}
+        <header className="hidden lg:flex items-center justify-between px-8 py-3 bg-white border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-500">Skyhawk</span>
-            <span className="text-gray-300">/</span>
-            <span className="font-semibold text-gray-900">{currentPageTitle}</span>
-          </div>
-          <div className="relative w-64">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search..."
-              className="w-full bg-white border-none rounded-full py-2 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-200 shadow-sm"
-            />
+            <span className="text-gray-400">Skyhawk</span>
+            <span className="text-gray-200">/</span>
+            <span className="font-semibold text-gray-800">{currentPageTitle}</span>
           </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:px-8 lg:pb-8">
+        <main className="flex-1 overflow-y-auto px-4 py-6 lg:px-8 lg:py-8 bg-white">
           <Outlet />
         </main>
       </div>

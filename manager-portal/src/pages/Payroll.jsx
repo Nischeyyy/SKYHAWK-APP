@@ -474,43 +474,75 @@ export default function Payroll() {
 
   return (
     <div>
-      <PageHeader
-        title="Payroll"
-        subtitle={`${displayedEntries.length}${displayedEntries.length !== entries.length ? ` of ${entries.length}` : ''} entries · ${totalGross.toFixed(2)} gross`}
-        action={
-          <div className="flex gap-2 flex-wrap">
-            {/* Export buttons */}
-            <button className="btn-primary flex items-center gap-1.5" onClick={exportExcel}>
-              <FileDown size={15} /> Excel
+      {/* ── Page header ── */}
+      <div className="flex items-start justify-between mb-5 gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Payroll</h1>
+          <p className="text-gray-400 mt-0.5 text-sm">
+            {displayedEntries.length}{displayedEntries.length !== entries.length ? ` of ${entries.length}` : ''} entries · ${totalGross.toFixed(2)} gross
+          </p>
+        </div>
+
+        {/* Action toolbar */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Export group */}
+          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+            <button onClick={exportExcel}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors border-r border-gray-200">
+              <FileDown size={14} className="text-gray-400" /> Excel
             </button>
-            <button className="btn-primary flex items-center gap-1.5" onClick={exportPDF}>
-              <FileDown size={15} /> PDF
-            </button>
-            <button className="btn-primary flex items-center gap-2" onClick={openImport}>
-              <Upload size={16} /> Import Timesheet
-            </button>
-            <button className="btn-primary flex items-center gap-2" onClick={() => { setCalcForm({ period_start: '', period_end: '', pay_date: '', hourly_rate: '' }); setError(''); setCalcModal(true); }}>
-              <Calculator size={16} /> Calculate
-            </button>
-            <button className="btn-primary flex items-center gap-2" onClick={openCreate}><Plus size={16} /> Add Entry</button>
-            <button
-              onClick={() => setFeaturePanelOpen(true)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm font-medium transition-all ${Object.values(features).some(Boolean) ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'}`}>
-              <Settings2 size={15} />
-              Features {Object.values(features).filter(Boolean).length > 0 && <span className="bg-white text-gray-900 rounded-full px-1.5 py-0.5 text-xs font-bold leading-none">{Object.values(features).filter(Boolean).length}</span>}
+            <button onClick={exportPDF}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+              <FileDown size={14} className="text-gray-400" /> PDF
             </button>
           </div>
-        }
-      />
 
-      {/* ── Status pills ── */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {['', 'submitted', 'under_review', 'approved', 'paid'].map(s => (
-          <button key={s} onClick={() => setFilterStatus(s)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${filterStatus === s ? 'bg-gray-900 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-            {s ? s.replace('_', ' ').charAt(0).toUpperCase() + s.replace('_', ' ').slice(1) : 'All'}
+          {/* Import */}
+          <button onClick={openImport}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <Upload size={14} className="text-gray-400" /> Import Timesheet
           </button>
-        ))}
+
+          {/* Calculate */}
+          <button onClick={() => { setCalcForm({ period_start: '', period_end: '', pay_date: '', hourly_rate: '' }); setError(''); setCalcModal(true); }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <Calculator size={14} className="text-gray-400" /> Calculate
+          </button>
+
+          {/* Add Entry — primary CTA */}
+          <button onClick={openCreate}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-gray-900 hover:bg-gray-700 rounded-lg transition-colors">
+            <Plus size={14} /> Add Entry
+          </button>
+
+          {/* Features */}
+          <button onClick={() => setFeaturePanelOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors ${Object.values(features).some(Boolean) ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+            <Settings2 size={14} />
+            {Object.values(features).filter(Boolean).length > 0 && (
+              <span className="bg-white text-gray-900 rounded-full px-1.5 text-xs font-bold leading-none py-0.5">
+                {Object.values(features).filter(Boolean).length}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Status tabs ── */}
+      <div className="flex gap-1 mb-5 border-b border-gray-100 pb-0">
+        {['', 'submitted', 'under_review', 'approved', 'paid'].map(s => {
+          const label = s ? s.replace('_', ' ').charAt(0).toUpperCase() + s.replace('_', ' ').slice(1) : 'All';
+          return (
+            <button key={s} onClick={() => setFilterStatus(s)}
+              className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                filterStatus === s
+                  ? 'border-gray-900 text-gray-900'
+                  : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-200'
+              }`}>
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── Guard filter + sort bar ── */}
@@ -659,7 +691,7 @@ export default function Payroll() {
             <option value="status">Status</option>
           </select>
           <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-            className="bg-gray-900 hover:bg-gray-700 text-white rounded-lg p-1.5 transition-colors" title={sortDir === 'asc' ? 'Ascending' : 'Descending'}>
+            className="border border-gray-200 text-gray-500 hover:bg-gray-50 rounded-lg p-1.5 transition-colors" title={sortDir === 'asc' ? 'Ascending' : 'Descending'}>
             {sortDir === 'asc' ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
         </div>
